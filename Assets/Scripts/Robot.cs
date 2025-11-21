@@ -3,7 +3,6 @@ using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.PathPlanner;
 using System.Collections.Generic;
 using RosMessageTypes.ObstacleManager;
-using System.Collections;
 
 public class Robot : MonoBehaviour
 {
@@ -31,7 +30,6 @@ public class Robot : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
 
-        ros.Subscribe<PathPlannerFeedbackMsg>("path_planner/feedback", FeedbackCallback);
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
 
         if (destinations.Count == 0) SendRequest();
@@ -141,13 +139,6 @@ public class Robot : MonoBehaviour
         ros.Publish("path_planner/request", req);
         isPathRequestPending = true;
         Debug.Log($"[Robot {robotId}] Sent path request: ({startX},{startY}), ({endX},{endY})");
-    }
-
-    void FeedbackCallback(PathPlannerFeedbackMsg fb)
-    {
-        if (fb.robot_id != robotId) return;
-
-        Debug.Log($"[Robot {robotId}] {fb.percent_complete:F1}%");
     }
 
     void ResultCallback(PathPlannerResponseMsg res)
