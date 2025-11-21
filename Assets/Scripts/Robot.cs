@@ -20,12 +20,12 @@ public class Robot : MonoBehaviour
     public float endX = 3;
     public float endY = 3;
 
-    private ROSConnection ros;
-    private Queue<Vector3> pathQueue = new();
-    private bool obstacleDetected = false;
+    protected ROSConnection ros;
+    protected Queue<Vector3> pathQueue = new();
+    protected bool obstacleDetected = false;
     private int destinationIndex = 0;
     private bool isPathRequestPending = false;
-    private bool isCleaning = false;
+    protected bool isPerformingTask = false;
 
     void Start()
     {
@@ -49,7 +49,7 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        if (isCleaning) return;
+        if (isPerformingTask) return;
 
         Vector3 target = pathQueue.Peek();
         CheckForObstacles(target);
@@ -96,18 +96,8 @@ public class Robot : MonoBehaviour
             {
                 if (hit.distance < obstacleDistanceThreshold)
                 {
-                    if(objectHit.CompareTag("DirtObstacle") && robotType == "cleaner")
-                    { 
-                        if(Vector3.Distance(gameObject.transform.position, objectHit.transform.position) < 0.1f)
-                        {
-                            if (!isCleaning)
-                            {
-                                StartCoroutine(CleanDirtRoutine(objectHit));
-                            }
-                            obstacleDetected = true;
-                            return;
-                        }
-                        
+                    if (HandleSpecialObstacle(objectHit)) 
+                    {
                         continue;
                     }
 
@@ -129,13 +119,9 @@ public class Robot : MonoBehaviour
         }
     }
 
-    private IEnumerator CleanDirtRoutine(GameObject dirt)
+    protected virtual bool HandleSpecialObstacle(GameObject objectHit)
     {
-        isCleaning = true;
-        Debug.Log($"[Robot {robotId}] Cleaning dirt at {dirt.transform.position}...");
-        yield return new WaitForSeconds(2f);
-        if (dirt != null) Destroy(dirt);
-        isCleaning = false;
+        return false;
     }
 
     public void SendRequest()

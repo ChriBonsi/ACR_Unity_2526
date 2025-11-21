@@ -31,9 +31,13 @@ public class RobotManagerClient : MonoBehaviour
     {
         Debug.Log("Spawning robot with ID: " + msg.robot_id);
         GameObject robotInstance = Instantiate(robotPrefab);
-        Robot robot = robotInstance.GetComponent<Robot>();
-        robot.robotId = msg.robot_id;
+        Robot robot = msg.robot_type switch
+        {
+            "cleaner" => robotInstance.AddComponent<CleanerRobot>(),
+            _ => robotInstance.AddComponent<Robot>(),
+        };
         robotInstance.transform.position = new Vector3(msg.start_x, msg.start_y, 0);
+        robot.robotId = msg.robot_id;
         robot.endX = msg.end_x;
         robot.endY = msg.end_y;
         var path = new List<Vector3>();
