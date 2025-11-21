@@ -26,45 +26,48 @@ public class Robot : MonoBehaviour
     private int destinationIndex = 0;
     private bool isPathRequestPending = false;
 
-     void Start()
+    void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
 
         ros.Subscribe<PathPlannerFeedbackMsg>("path_planner/feedback", FeedbackCallback);
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
 
-        if(destinations.Count == 0) SendRequest(); 
+        if (destinations.Count == 0) SendRequest();
 
         perceptionRadius *= gameObject.transform.lossyScale.x;
     }
 
-     void Update()
+    void Update()
     {
         if (gameObject == null) return;
 
         if (pathQueue.Count == 0)
         {
-            if (loop && !isPathRequestPending)
-            {
-                destinationIndex = (destinationIndex + 1) % destinations.Count;
-                endX = destinations[destinationIndex].x;
-                endY = destinations[destinationIndex].y;
-                SendRequest();
-                isPathRequestPending = true;
-            }
+            CheckAndAskForNewPath();
             return;
         }
 
-        //if (!isMoving) return;
-
         Vector3 target = pathQueue.Peek();
-
         CheckForObstacles(target);
-
         isMoving = !obstacleDetected;
-
         if (!isMoving) return;
+        Move(target);
+    }
 
+    private void CheckAndAskForNewPath()
+    {
+        if (loop && !isPathRequestPending)
+        {
+            destinationIndex = (destinationIndex + 1) % destinations.Count;
+            endX = destinations[destinationIndex].x;
+            endY = destinations[destinationIndex].y;
+            SendRequest();
+        }
+    }
+
+    private void Move(Vector3 target)
+    {
         gameObject.transform.position =
             Vector3.MoveTowards(gameObject.transform.position, target, moveSpeed * Time.deltaTime);
 
@@ -81,7 +84,8 @@ public class Robot : MonoBehaviour
 
         foreach (var hit in hits)
         {
-            if (hit.collider != null && hit.collider.gameObject != gameObject)
+            GameObject objectHit = hit.collider != null ? hit.collider.gameObject : null;
+            if (objectHit != null && objectHit != gameObject)
             {
                 //Debug.Log(hit.transform.position + " - " + hit.distance);
                 if (hit.distance < obstacleDistanceThreshold && !obstacleDetected)
@@ -89,16 +93,16 @@ public class Robot : MonoBehaviour
                     /* Debug.LogWarning($"[Robot {robotId}] Obstacle detected! Stopping movement.");
                     Debug.LogWarning("Hit object: " + hit.collider.gameObject.name); */
 
-                    obstacleDetected = true;
-
                     var req = new ObstacleManagerSubscriberMsg()
                     {
                         x = hit.transform.position.x,
                         y = hit.transform.position.y,
-                        type = hit.collider.gameObject.tag
+                        type = objectHit.tag
                     };
                     ros.Publish("obstacle_manager/report_obstacle", req);
                     Debug.Log($"[Robot {robotId}] Reported obstacle at ({req.x}, {req.y}) to Obstacle Manager.");
+
+                    obstacleDetected = true;
                     return;
                 }
             }
@@ -120,6 +124,7 @@ public class Robot : MonoBehaviour
         };
 
         ros.Publish("path_planner/request", req);
+        isPathRequestPending = true;
         Debug.Log($"[Robot {robotId}] Sent path request: ({startX},{startY}), ({endX},{endY})");
     }
 
