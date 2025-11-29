@@ -6,6 +6,7 @@ TagManager:
   tags:
   - DirtObstacle
   - UnattendedObstacle
+  - Robot
   layers:
   - Default
   - TransparentFX

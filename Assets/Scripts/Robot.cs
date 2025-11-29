@@ -51,6 +51,9 @@ public class Robot : MonoBehaviour
     void Update()
     {
         if (gameObject == null) return;
+
+        //SendTrackingData();
+
         if (battery <= 0f)
         {
             return;
@@ -62,7 +65,6 @@ public class Robot : MonoBehaviour
             return;
         }
         
-        //SendTrackingData();
         if (pathQueue.Count == 0)
         {
             CheckAndAskForNewPath();
@@ -139,6 +141,7 @@ public class Robot : MonoBehaviour
     private void CheckForObstacles(Vector3 target)
     {
         Vector3 currentPosition = gameObject.transform.position;
+        Debug.Log(Vector3.Distance(currentPosition, target));
         RaycastHit2D[] hits = Physics2D.CircleCastAll(
             currentPosition,
             0.5f,
@@ -164,6 +167,15 @@ public class Robot : MonoBehaviour
         }
     }
 
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        Debug.Log("Collision detected for Robot " + robotId);
+        if (collision.gameObject.CompareTag("Robot"))
+        {
+            Debug.Log("Robot " + robotId + " collided with another robot.");
+        }
+    }
+
     protected void ReportObstacle(GameObject obstacle, string status)
     {
         if (reportedObstacles.Contains(obstacle)) return;
@@ -173,6 +185,8 @@ public class Robot : MonoBehaviour
             y = obstacle.transform.position.y,
             type = obstacle.tag,
             status = status,
+            scale_x = obstacle.transform.localScale.x,
+            scale_y = obstacle.transform.localScale.y,
             id = obstacle.GetInstanceID().ToString()
         };
         ros.Publish("obstacle_manager/report_obstacle", req);

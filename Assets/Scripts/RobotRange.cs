@@ -14,15 +14,12 @@ public class RobotRange : MonoBehaviour
 
     private LineRenderer rangeRenderer;
     private Robot robot;
-    private float rangeRadius;
     private Vector3 direction;
 
     void Start()
     {
         robot = gameObject.GetComponent<Robot>();
-        rangeRadius = robot.perceptionRadius;
         direction = GetDirection();
-        rangeRadius /= Mathf.Max(0.0001f, gameObject.transform.lossyScale.x);
         if (showRange) EnsureRangeRenderer();
     }
 
@@ -44,7 +41,7 @@ public class RobotRange : MonoBehaviour
             Vector3 dir = (targetPosition - robotPosition).normalized;
             return dir;
         }
-        return Vector3.up;
+        return direction;
     }
 
     private void EnsureRangeRenderer()

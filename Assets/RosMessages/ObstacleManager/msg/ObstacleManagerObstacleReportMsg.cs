@@ -17,6 +17,8 @@ namespace RosMessageTypes.ObstacleManager
         public float y;
         public string type;
         public string status;
+        public float scale_x;
+        public float scale_y;
         public string id;
 
         public ObstacleManagerObstacleReportMsg()
@@ -25,15 +27,19 @@ namespace RosMessageTypes.ObstacleManager
             this.y = 0.0f;
             this.type = "";
             this.status = "";
+            this.scale_x = 0.0f;
+            this.scale_y = 0.0f;
             this.id = "";
         }
 
-        public ObstacleManagerObstacleReportMsg(float x, float y, string type, string status, string id)
+        public ObstacleManagerObstacleReportMsg(float x, float y, string type, string status, float scale_x, float scale_y, string id)
         {
             this.x = x;
             this.y = y;
             this.type = type;
             this.status = status;
+            this.scale_x = scale_x;
+            this.scale_y = scale_y;
             this.id = id;
         }
 
@@ -45,6 +51,8 @@ namespace RosMessageTypes.ObstacleManager
             deserializer.Read(out this.y);
             deserializer.Read(out this.type);
             deserializer.Read(out this.status);
+            deserializer.Read(out this.scale_x);
+            deserializer.Read(out this.scale_y);
             deserializer.Read(out this.id);
         }
 
@@ -54,6 +62,8 @@ namespace RosMessageTypes.ObstacleManager
             serializer.Write(this.y);
             serializer.Write(this.type);
             serializer.Write(this.status);
+            serializer.Write(this.scale_x);
+            serializer.Write(this.scale_y);
             serializer.Write(this.id);
         }
 
@@ -64,6 +74,8 @@ namespace RosMessageTypes.ObstacleManager
             "\ny: " + y.ToString() +
             "\ntype: " + type.ToString() +
             "\nstatus: " + status.ToString() +
+            "\nscale_x: " + scale_x.ToString() +
+            "\nscale_y: " + scale_y.ToString() +
             "\nid: " + id.ToString();
         }
 
