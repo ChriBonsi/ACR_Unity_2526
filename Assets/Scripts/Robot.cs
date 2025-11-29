@@ -141,7 +141,6 @@ public class Robot : MonoBehaviour
     private void CheckForObstacles(Vector3 target)
     {
         Vector3 currentPosition = gameObject.transform.position;
-        Debug.Log(Vector3.Distance(currentPosition, target));
         RaycastHit2D[] hits = Physics2D.CircleCastAll(
             currentPosition,
             0.5f,
