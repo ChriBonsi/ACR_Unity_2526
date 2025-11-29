@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
 public class CleanerRobot : Robot
 {
@@ -14,31 +13,29 @@ public class CleanerRobot : Robot
                 {
                     StartCoroutine(CleanDirtRoutine(objectHit));
                 }
-                obstacleDetected = true;
+                //obstacleDetected = true;
             }
-            return true;
-        }
-        else if (objectHit.CompareTag("UnattendedObstacle"))
-        {
-            ReportObstacle(objectHit);
-            if(Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f) PerformSideStep(objectHit);
             return true;
         }
 
         return false;
     }
 
-    private IEnumerator CleanDirtRoutine(GameObject dirt)
+    private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
         isPerformingTask = true;
-        Debug.Log($"[CleanerRobot {robotId}] Cleaning dirt at {dirt.transform.position}...");
+        Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
         
+        icon.SetActive(true);
+
         yield return new WaitForSeconds(2f);
+
+        icon.SetActive(false);
         
-        if (dirt != null) Destroy(dirt);
+        if (obstacle != null) Destroy(obstacle);
         
+        ReportObstacle(obstacle, "handled");
         isPerformingTask = false;
-        //obstacleDetected = false; 
     }
 
     protected override void UpdateTask()

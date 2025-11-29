@@ -8,36 +8,44 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.ObstacleManager
 {
     [Serializable]
-    public class ObstacleManagerSubscriberMsg : Message
+    public class ObstacleManagerObstacleReportMsg : Message
     {
-        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerSubscriber";
+        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerObstacleReport";
         public override string RosMessageName => k_RosMessageName;
 
         public float x;
         public float y;
         public string type;
+        public string status;
+        public string id;
 
-        public ObstacleManagerSubscriberMsg()
+        public ObstacleManagerObstacleReportMsg()
         {
             this.x = 0.0f;
             this.y = 0.0f;
             this.type = "";
+            this.status = "";
+            this.id = "";
         }
 
-        public ObstacleManagerSubscriberMsg(float x, float y, string type)
+        public ObstacleManagerObstacleReportMsg(float x, float y, string type, string status, string id)
         {
             this.x = x;
             this.y = y;
             this.type = type;
+            this.status = status;
+            this.id = id;
         }
 
-        public static ObstacleManagerSubscriberMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerSubscriberMsg(deserializer);
+        public static ObstacleManagerObstacleReportMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerObstacleReportMsg(deserializer);
 
-        private ObstacleManagerSubscriberMsg(MessageDeserializer deserializer)
+        private ObstacleManagerObstacleReportMsg(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.x);
             deserializer.Read(out this.y);
             deserializer.Read(out this.type);
+            deserializer.Read(out this.status);
+            deserializer.Read(out this.id);
         }
 
         public override void SerializeTo(MessageSerializer serializer)
@@ -45,14 +53,18 @@ namespace RosMessageTypes.ObstacleManager
             serializer.Write(this.x);
             serializer.Write(this.y);
             serializer.Write(this.type);
+            serializer.Write(this.status);
+            serializer.Write(this.id);
         }
 
         public override string ToString()
         {
-            return "ObstacleManagerSubscriberMsg: " +
+            return "ObstacleManagerObstacleReportMsg: " +
             "\nx: " + x.ToString() +
             "\ny: " + y.ToString() +
-            "\ntype: " + type.ToString();
+            "\ntype: " + type.ToString() +
+            "\nstatus: " + status.ToString() +
+            "\nid: " + id.ToString();
         }
 
 #if UNITY_EDITOR

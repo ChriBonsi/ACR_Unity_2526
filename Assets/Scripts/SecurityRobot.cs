@@ -1,44 +1,48 @@
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
 public class SecurityRobot : Robot
 {
-    private Vector3 securedLocation = new(9, 1, 0);
+    private Vector3 securedLocation = new(6, 11, 0);
     private bool isDestroying = false;
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
-            if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.5f)
+            if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f)
             {
                 if (!isPerformingTask)
                 {
                     StartCoroutine(PickupRoutine(objectHit));
                 }
-                obstacleDetected = true;
+                //obstacleDetected = true;
             }
-            ReportObstacle(objectHit);
+            //ReportObstacle(objectHit);
             return true;
         }
 
         return false;
     }
 
-    private IEnumerator PickupRoutine(GameObject unattended)
+    private IEnumerator PickupRoutine(GameObject obstacle)
     {
         isPerformingTask = true;
         pathQueue.Clear();
-        Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle at {unattended.transform.position}...");
+        Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle {obstacle.GetInstanceID()}...");
+
+        icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);
 
-        if (unattended != null)
+        icon.SetActive(false);
+
+        if (obstacle != null)
         {
-            unattended.transform.SetParent(transform);
-            unattended.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            obstacle.transform.SetParent(transform);
+            obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
         }
 
+        ReportObstacle(obstacle, "handled");
         endX = securedLocation.x;
         endY = securedLocation.y;
         SendRequest();
@@ -55,7 +59,7 @@ public class SecurityRobot : Robot
             Move(target);
             CheckIfQueuedPointReached(target);
         }
-        else if (Vector3.Distance(transform.position, securedLocation) < 0.5f)
+        else if (Vector3.Distance(transform.position, securedLocation) < 0.2f)
         {
             if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
         }
@@ -65,7 +69,11 @@ public class SecurityRobot : Robot
     {
         isDestroying = true;
 
+        icon.SetActive(true);
+
         yield return new WaitForSeconds(2f);
+
+        icon.SetActive(false);
         
         foreach (Transform child in transform)
         {
