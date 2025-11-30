@@ -40,45 +40,51 @@ public class Robot : MonoBehaviour
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
 
-        SendRequest();
-
-        icon = gameObject.transform.Find("TaskIcon").gameObject;
+        icon = transform.Find("TaskIcon").gameObject;
         icon.SetActive(false);
 
-        perceptionRadius *= gameObject.transform.lossyScale.x;
+        perceptionRadius *= transform.lossyScale.x;
+
+        destinationIndex = destinations.FindIndex(
+            v => v.x == endX && v.y == endY
+        );
+
+        SendRequest();
     }
 
     void Update()
     {
         if (gameObject == null) return;
 
-        //SendTrackingData();
-
         if (battery <= 0f)
         {
+            // Request battery change
             return;
         }
 
-        if(isPerformingTask)
+        CheckForObstacles();
+
+        if(obstacleDetected)
+        {
+            SendRequest();
+            return;
+        }
+
+        if (isPerformingTask)
         {
             UpdateTask();
             return;
         }
         
-        if (pathQueue.Count == 0)
+        // Basic movement
+
+        Move();
+        CheckIfQueuedPointReached();
+
+        if(pathQueue.Count == 0)
         {
             CheckAndAskForNewPath();
-            return;
         }
-        Vector3 target = pathQueue.Peek();
-        CheckForObstacles(target);
-        if (obstacleDetected)
-        {
-            SendRequest();
-            return;
-        }
-        Move(target);
-        CheckIfQueuedPointReached(target);
     }
 
     private void SendTrackingData()
@@ -89,8 +95,8 @@ public class Robot : MonoBehaviour
             var trackerMsg = new RobotManagerTrackerSubscriberMsg()
             {
                 robot_id = robotId,
-                current_x = gameObject.transform.position.x,
-                current_y = gameObject.transform.position.y,
+                current_x = transform.position.x,
+                current_y = transform.position.y,
                 start_x = startX,
                 start_y = startY,
                 end_x = endX,
@@ -113,9 +119,17 @@ public class Robot : MonoBehaviour
 
     private void CheckAndAskForNewPath()
     {
-        if (loop && !isPathRequestPending)
+        if (destinations.Count > 0 && !isPathRequestPending)
         {
-            destinationIndex = (destinationIndex + 1) % destinations.Count;
+            if (loop)
+            {
+                destinationIndex = (destinationIndex + 1) % destinations.Count;
+            }
+            else
+            {
+                if (destinationIndex >= destinations.Count - 1) return;
+                destinationIndex++;
+            }
             Vector3 nextDestination = destinations[destinationIndex];
             endX = nextDestination.x;
             endY = nextDestination.y;
@@ -123,28 +137,37 @@ public class Robot : MonoBehaviour
         }
     }
 
-    protected void Move(Vector3 target)
+    protected void Move()
     {
-        gameObject.transform.position =
-            Vector3.MoveTowards(gameObject.transform.position, target, moveSpeed * Time.deltaTime);
+        if (pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        transform.position =
+            Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
         UpdateBattery(-moveSpeed * Time.deltaTime * 0.1f);
     }
 
-    protected void CheckIfQueuedPointReached(Vector3 target)
+    protected void CheckIfQueuedPointReached()
     {
-        if (Vector3.Distance(gameObject.transform.position, target) < 0.02f)
+        if (pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        if (Vector3.Distance(transform.position, target) < 0.02f)
         {
             pathQueue.Dequeue();
         }
     }
 
-    private void CheckForObstacles(Vector3 target)
+    protected void CheckForObstacles()
     {
-        Vector3 currentPosition = gameObject.transform.position;
+        if(pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        Vector3 currentPosition = transform.position;
+        Vector2 direction = target - currentPosition;
+        if(direction == Vector2.zero) return;
+
         RaycastHit2D[] hits = Physics2D.CircleCastAll(
             currentPosition,
             0.5f,
-            (target - currentPosition).normalized,
+            direction.normalized,
             Vector3.Distance(currentPosition, target)
         );
 
@@ -155,28 +178,20 @@ public class Robot : MonoBehaviour
 
         foreach (var hit in hits)
         {
-            GameObject objectHit = hit.collider != null ? hit.collider.gameObject : null;
+            if(hit.collider == null) continue;
+            GameObject objectHit = hit.collider.gameObject;
             if (objectHit == null || objectHit == gameObject) continue;
-            //if (hit.distance > obstacleDistanceThreshold) continue;
-            if (HandleSpecialObstacle(objectHit)) return;
-            //if (obstacleDetected) return;
+            if (hit.distance > obstacleDistanceThreshold) continue;
             ReportObstacle(objectHit, "unhandled");
+            if (HandleSpecialObstacle(objectHit)) return;
             obstacleDetected = true;
             return;
         }
     }
 
-    void OnCollisionEnter2D(Collision2D collision)
-    {
-        Debug.Log("Collision detected for Robot " + robotId);
-        if (collision.gameObject.CompareTag("Robot"))
-        {
-            Debug.Log("Robot " + robotId + " collided with another robot.");
-        }
-    }
-
     protected void ReportObstacle(GameObject obstacle, string status)
     {
+        if(status == "handled") reportedObstacles.Remove(obstacle);
         if (reportedObstacles.Contains(obstacle)) return;
         var req = new ObstacleManagerObstacleReportMsg()
         {
@@ -189,8 +204,8 @@ public class Robot : MonoBehaviour
             id = obstacle.GetInstanceID().ToString()
         };
         ros.Publish("obstacle_manager/report_obstacle", req);
-        reportedObstacles.Add(obstacle);
-        Debug.Log($"[Robot {robotId}] Reported obstacle {obstacle.GetInstanceID()} to Obstacle Manager.");
+        if(status != "handled") reportedObstacles.Add(obstacle);
+        Debug.Log($"[Robot {robotId}] Reported obstacle {obstacle.GetInstanceID()}, ({obstacle.transform.position.x}, {obstacle.transform.position.y}) to Obstacle Manager.");
     }
     protected void UpdateBattery(float amount)
     {
@@ -211,7 +226,6 @@ public class Robot : MonoBehaviour
     public void SendRequest()
     {
         if (isPathRequestPending) return;
-        Transform transform = gameObject.transform;
         float currentX = transform.position.x;
         float currentY = transform.position.y;
         var req = new PathPlannerRequestMsg()
@@ -236,7 +250,7 @@ public class Robot : MonoBehaviour
         {
             Debug.LogError($"[Robot {robotId}] Path planning failed.");
             isPathRequestPending = false;
-            CheckAndAskForNewPath();
+            //CheckAndAskForNewPath();
             return;
         }
 
@@ -254,7 +268,7 @@ public class Robot : MonoBehaviour
             pathQueue.Enqueue(point);
         }
 
-        //obstacleDetected = false;
+        obstacleDetected = false;
         isPathRequestPending = false;
         //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
     }

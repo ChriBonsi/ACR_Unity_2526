@@ -15,9 +15,7 @@ public class SecurityRobot : Robot
                 {
                     StartCoroutine(PickupRoutine(objectHit));
                 }
-                //obstacleDetected = true;
             }
-            //ReportObstacle(objectHit);
             return true;
         }
 
@@ -36,11 +34,12 @@ public class SecurityRobot : Robot
 
         icon.SetActive(false);
 
-        if (obstacle != null)
-        {
-            obstacle.transform.SetParent(transform);
-            obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-        }
+        obstacle.GetComponent<BoxCollider2D>().enabled = false;
+
+
+        obstacle.transform.SetParent(transform);
+        obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+
 
         ReportObstacle(obstacle, "handled");
         endX = securedLocation.x;
@@ -51,18 +50,22 @@ public class SecurityRobot : Robot
     protected override void UpdateTask()
     {
         if (!isPerformingTask) return;
-        if (isPathRequestPending) return;
+        CheckForObstacles();
 
-        if (pathQueue.Count > 0)
+        if (obstacleDetected)
         {
-            Vector3 target = pathQueue.Peek();
-            Move(target);
-            CheckIfQueuedPointReached(target);
+            SendRequest();
+            return;
         }
-        else if (Vector3.Distance(transform.position, securedLocation) < 0.2f)
+
+        if (Vector3.Distance(transform.position, securedLocation) < 0.2f)
         {
             if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
+            return;
         }
+
+        Move();
+        CheckIfQueuedPointReached();
     }
 
     private IEnumerator DestroyUnattendedRoutine()
@@ -74,7 +77,7 @@ public class SecurityRobot : Robot
         yield return new WaitForSeconds(2f);
 
         icon.SetActive(false);
-        
+
         foreach (Transform child in transform)
         {
             if (child.CompareTag("UnattendedObstacle"))
@@ -85,7 +88,7 @@ public class SecurityRobot : Robot
 
         Debug.Log($"[SecurityRobot {robotId}] Package destroyed at {securedLocation}.");
 
-        SetNextDestination();
+        //SetNextDestination();
         isPerformingTask = false;
         obstacleDetected = false;
         isDestroying = false;
@@ -94,7 +97,7 @@ public class SecurityRobot : Robot
     private void SetNextDestination()
     {
         float minDistance = float.MaxValue;
-        int closestIndex = 0;
+        int closestIndex = -1;
         for (int i = 0; i < destinations.Count; i++)
         {
             float d = Vector3.Distance(transform.position, destinations[i]);
@@ -104,6 +107,6 @@ public class SecurityRobot : Robot
                 closestIndex = i;
             }
         }
-        destinationIndex = closestIndex;
+        if (closestIndex != -1) destinationIndex = closestIndex;
     }
 }

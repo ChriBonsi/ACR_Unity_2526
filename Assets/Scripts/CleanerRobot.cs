@@ -13,32 +13,29 @@ public class CleanerRobot : Robot
                 {
                     StartCoroutine(CleanDirtRoutine(objectHit));
                 }
-                //obstacleDetected = true;
             }
             return true;
         }
-
         return false;
+    }
+
+    protected override void UpdateTask()
+    {
     }
 
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
         isPerformingTask = true;
         Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
-        
+
         icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);
 
         icon.SetActive(false);
-        
-        if (obstacle != null) Destroy(obstacle);
-        
+
+        Destroy(obstacle);
         ReportObstacle(obstacle, "handled");
         isPerformingTask = false;
-    }
-
-    protected override void UpdateTask()
-    {
     }
 }
