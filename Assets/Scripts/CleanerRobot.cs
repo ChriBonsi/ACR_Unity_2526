@@ -28,11 +28,16 @@ public class CleanerRobot : Robot
     {
     }
 
+    protected override bool IsTaskInterruptible()
+    {
+        return true; 
+    }
+
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
         Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
         currentState = RobotState.HandlingObstacle;
-        
+
         icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);

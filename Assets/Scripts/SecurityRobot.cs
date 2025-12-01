@@ -1,9 +1,12 @@
 using UnityEngine;
 using System.Collections;
+using NUnit.Framework;
 
 public class SecurityRobot : Robot
 {
     private Vector3 securedLocation = new(6, 11, 0);
+    private bool isDestroying = false;
+    private bool isHoldingObstacle = false;
 
     protected override int GetPriority()
     {
@@ -23,13 +26,34 @@ public class SecurityRobot : Robot
             }
             return true;
         }
-
         return false;
     }
 
     protected override void UpdateTask()
     {
         if (currentState != RobotState.HandlingObstacle) return;
+
+        if (isHoldingObstacle)
+        {
+            CheckSensors();
+
+            if(currentState == RobotState.Yielding) return;
+
+            if (Vector3.Distance(transform.position, securedLocation) < 0.1f)
+            {
+                if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
+            }
+            else
+            {
+                Move();
+                CheckIfQueuedPointReached();
+            }
+        }
+    }
+
+    protected override bool IsTaskInterruptible()
+    {
+        return !isHoldingObstacle; 
     }
 
     private IEnumerator PickupRoutine(GameObject obstacle)
@@ -50,6 +74,7 @@ public class SecurityRobot : Robot
         obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
         ReportObstacle(obstacle, "handled");
+        isHoldingObstacle = true;
         endX = securedLocation.x;
         endY = securedLocation.y;
         SendRequest();
@@ -57,6 +82,8 @@ public class SecurityRobot : Robot
 
     private IEnumerator DestroyUnattendedRoutine()
     {
+        isDestroying = true;
+
         icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);
@@ -73,22 +100,8 @@ public class SecurityRobot : Robot
 
         Debug.Log($"[SecurityRobot {robotId}] Package destroyed at {securedLocation}.");
 
+        isHoldingObstacle = false;
+        isDestroying = false;
         currentState = RobotState.Moving;
-    }
-
-    private void SetNextDestination()
-    {
-        float minDistance = float.MaxValue;
-        int closestIndex = -1;
-        for (int i = 0; i < destinations.Count; i++)
-        {
-            float d = Vector3.Distance(transform.position, destinations[i]);
-            if (d < minDistance)
-            {
-                minDistance = d;
-                closestIndex = i;
-            }
-        }
-        if (closestIndex != -1) destinationIndex = closestIndex;
     }
 }
