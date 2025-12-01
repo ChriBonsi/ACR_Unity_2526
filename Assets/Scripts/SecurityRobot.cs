@@ -4,14 +4,19 @@ using System.Collections;
 public class SecurityRobot : Robot
 {
     private Vector3 securedLocation = new(6, 11, 0);
-    private bool isDestroying = false;
+
+    protected override int GetPriority()
+    {
+        return 2;
+    }
+
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
             if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f)
             {
-                if (!isPerformingTask)
+                if (currentState != RobotState.HandlingObstacle)
                 {
                     StartCoroutine(PickupRoutine(objectHit));
                 }
@@ -22,9 +27,14 @@ public class SecurityRobot : Robot
         return false;
     }
 
+    protected override void UpdateTask()
+    {
+        if (currentState != RobotState.HandlingObstacle) return;
+    }
+
     private IEnumerator PickupRoutine(GameObject obstacle)
     {
-        isPerformingTask = true;
+        currentState = RobotState.HandlingObstacle;
         pathQueue.Clear();
         Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle {obstacle.GetInstanceID()}...");
 
@@ -36,10 +46,8 @@ public class SecurityRobot : Robot
 
         obstacle.GetComponent<BoxCollider2D>().enabled = false;
 
-
         obstacle.transform.SetParent(transform);
         obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-
 
         ReportObstacle(obstacle, "handled");
         endX = securedLocation.x;
@@ -47,31 +55,8 @@ public class SecurityRobot : Robot
         SendRequest();
     }
 
-    protected override void UpdateTask()
-    {
-        if (!isPerformingTask) return;
-        CheckForObstacles();
-
-        if (obstacleDetected)
-        {
-            SendRequest();
-            return;
-        }
-
-        if (Vector3.Distance(transform.position, securedLocation) < 0.2f)
-        {
-            if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
-            return;
-        }
-
-        Move();
-        CheckIfQueuedPointReached();
-    }
-
     private IEnumerator DestroyUnattendedRoutine()
     {
-        isDestroying = true;
-
         icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);
@@ -88,10 +73,7 @@ public class SecurityRobot : Robot
 
         Debug.Log($"[SecurityRobot {robotId}] Package destroyed at {securedLocation}.");
 
-        //SetNextDestination();
-        isPerformingTask = false;
-        obstacleDetected = false;
-        isDestroying = false;
+        currentState = RobotState.Moving;
     }
 
     private void SetNextDestination()

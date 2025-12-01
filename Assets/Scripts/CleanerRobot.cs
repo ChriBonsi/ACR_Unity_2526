@@ -3,13 +3,18 @@ using System.Collections;
 
 public class CleanerRobot : Robot
 {
+    protected override int GetPriority()
+    {
+        return 1;
+    }
+
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
         if (objectHit.CompareTag("DirtObstacle"))
         {
             if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.1f)
             {
-                if (!isPerformingTask)
+                if (currentState != RobotState.HandlingObstacle)
                 {
                     StartCoroutine(CleanDirtRoutine(objectHit));
                 }
@@ -25,9 +30,9 @@ public class CleanerRobot : Robot
 
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
-        isPerformingTask = true;
         Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
-
+        currentState = RobotState.HandlingObstacle;
+        
         icon.SetActive(true);
 
         yield return new WaitForSeconds(2f);
@@ -36,6 +41,7 @@ public class CleanerRobot : Robot
 
         Destroy(obstacle);
         ReportObstacle(obstacle, "handled");
-        isPerformingTask = false;
+
+        currentState = RobotState.Moving;
     }
 }

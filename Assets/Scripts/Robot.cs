@@ -16,6 +16,7 @@ public class Robot : MonoBehaviour
     public List<Vector3> destinations = new();
     public bool loop = false;
     public float battery = 100f;
+    public RobotState currentState = RobotState.Moving;
 
     [Header("Request")]
     public float endX = 3;
@@ -23,16 +24,13 @@ public class Robot : MonoBehaviour
 
     protected ROSConnection ros;
     public Queue<Vector3> pathQueue = new();
-    protected bool obstacleDetected = false;
     protected int destinationIndex = 1;
     protected bool isPathRequestPending = false;
-    protected bool isPerformingTask = false;
-    private float trackerTimer = 0f;
-    private const float trackerInterval = 1f;
     private float startX;
     private float startY;
     private List<GameObject> reportedObstacles = new();
     protected GameObject icon;
+    private GameObject currentRobotObstacle = null;
 
     void Start()
     {
@@ -62,6 +60,33 @@ public class Robot : MonoBehaviour
             return;
         }
 
+        if(currentState == RobotState.Moving)
+        {
+            CheckSensors();
+        }
+
+        switch (currentState)
+        {
+            case RobotState.Moving:
+            Move();
+            CheckIfQueuedPointReached();
+            if(pathQueue.Count == 0)
+            {
+                CheckAndAskForNewPath();
+            }
+            break;
+            case RobotState.Yielding:
+            CheckIfYieldIsDone();
+            break;
+            case RobotState.HandlingObstacle:
+            UpdateTask();
+            break;
+            case RobotState.WaitingForPath:
+            break;
+        }
+
+        /* if(yield) return;
+
         CheckForObstacles();
 
         if(obstacleDetected)
@@ -84,10 +109,12 @@ public class Robot : MonoBehaviour
         if(pathQueue.Count == 0)
         {
             CheckAndAskForNewPath();
-        }
+        } */
     }
 
-    private void SendTrackingData()
+    protected virtual int GetPriority() { return 0; }
+
+    /* private void SendTrackingData()
     {
         trackerTimer += Time.deltaTime;
         if (trackerTimer >= trackerInterval)
@@ -115,7 +142,7 @@ public class Robot : MonoBehaviour
             RobotManagerClient.SendTrackingData(trackerMsg);
             trackerTimer = 0f;
         }
-    }
+    } */
 
     private void CheckAndAskForNewPath()
     {
@@ -156,7 +183,7 @@ public class Robot : MonoBehaviour
         }
     }
 
-    protected void CheckForObstacles()
+    protected void CheckSensors()
     {
         if(pathQueue.Count == 0) return;
         Vector3 target = pathQueue.Peek();
@@ -171,21 +198,78 @@ public class Robot : MonoBehaviour
             Vector3.Distance(currentPosition, target)
         );
 
-        obstacleDetected = false;
         if (hits.Length == 0) return;
 
-        //System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
+        System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
 
         foreach (var hit in hits)
         {
             if(hit.collider == null) continue;
             GameObject objectHit = hit.collider.gameObject;
             if (objectHit == null || objectHit == gameObject) continue;
-            if (hit.distance > obstacleDistanceThreshold) continue;
-            ReportObstacle(objectHit, "unhandled");
+
+            // Dynamic robot-robot
+            if(objectHit.CompareTag("Robot"))
+            {
+                Robot otherRobot = objectHit.GetComponent<Robot>();
+                HandleRobotInteraction(otherRobot, hit.distance);
+                if(currentState == RobotState.Yielding) return;
+            }
+
+            if(hit.distance <= obstacleDistanceThreshold)
+            {
+                HandleStaticObstacle(objectHit);
+                return;
+            }
+
+            /* ReportObstacle(objectHit, "unhandled");
             if (HandleSpecialObstacle(objectHit)) return;
             obstacleDetected = true;
-            return;
+            return; */
+        }
+    }
+
+    private void HandleRobotInteraction(Robot otherRobot, float distance)
+    {
+        if(distance > obstacleDistanceThreshold + 0.5f) return;
+
+        int myPriority = GetPriority();
+        int otherPriority = otherRobot.GetPriority();
+        bool yield = false;
+
+        if (myPriority < otherPriority) 
+        {
+            yield = true;
+        }
+        else if (myPriority == otherPriority)
+        {
+            if (robotId > otherRobot.robotId) yield = true;
+        }
+
+        if (yield)
+        {
+            Debug.Log($"[Robot {robotId}] Yielding to Robot {otherRobot.robotId}.");
+            currentRobotObstacle = otherRobot.gameObject;
+            currentState = RobotState.Yielding;
+        }
+    }
+
+    private void HandleStaticObstacle(GameObject objectHit)
+    {
+        if(HandleSpecialObstacle(objectHit)) return;
+        ReportObstacle(objectHit, "unhandled");
+        currentState = RobotState.WaitingForPath;
+        SendRequest();
+    }
+
+    private void CheckIfYieldIsDone()
+    {
+        if (currentRobotObstacle == null || 
+        Vector3.Distance(transform.position, currentRobotObstacle.transform.position) > perceptionRadius + 0.5f)
+        {
+            currentState = RobotState.Moving;
+            currentRobotObstacle = null;
+            Debug.Log($"[Robot {robotId}] Yield clear. Resuming movement.");
         }
     }
 
@@ -207,6 +291,7 @@ public class Robot : MonoBehaviour
         if(status != "handled") reportedObstacles.Add(obstacle);
         Debug.Log($"[Robot {robotId}] Reported obstacle {obstacle.GetInstanceID()}, ({obstacle.transform.position.x}, {obstacle.transform.position.y}) to Obstacle Manager.");
     }
+
     protected void UpdateBattery(float amount)
     {
         //Debug.Log($"[Robot {robotId}] Battery changed by {amount}.");
@@ -220,7 +305,6 @@ public class Robot : MonoBehaviour
 
     protected virtual void UpdateTask()
     {
-
     }
 
     public void SendRequest()
@@ -250,7 +334,6 @@ public class Robot : MonoBehaviour
         {
             Debug.LogError($"[Robot {robotId}] Path planning failed.");
             isPathRequestPending = false;
-            //CheckAndAskForNewPath();
             return;
         }
 
@@ -263,13 +346,11 @@ public class Robot : MonoBehaviour
                 res.path_y[i],
                 0f
             );
-            //if (Vector3.Distance(robot.transform.position, point) < 0.05f) continue;
-
             pathQueue.Enqueue(point);
         }
 
-        obstacleDetected = false;
         isPathRequestPending = false;
+        currentState = RobotState.Moving;
         //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
     }
 }
