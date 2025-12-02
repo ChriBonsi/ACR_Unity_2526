@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections;
-using NUnit.Framework;
 
 public class SecurityRobot : Robot
 {
@@ -15,6 +14,8 @@ public class SecurityRobot : Robot
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
+        if(currentState == RobotState.HandlingObstacle) return false;
+
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
             if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f)
@@ -37,8 +38,6 @@ public class SecurityRobot : Robot
         {
             CheckSensors();
 
-            if(currentState == RobotState.Yielding) return;
-
             if (Vector3.Distance(transform.position, securedLocation) < 0.1f)
             {
                 if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
@@ -51,10 +50,10 @@ public class SecurityRobot : Robot
         }
     }
 
-    protected override bool IsTaskInterruptible()
+    /* protected override bool IsTaskInterruptible()
     {
         return !isHoldingObstacle; 
-    }
+    } */
 
     private IEnumerator PickupRoutine(GameObject obstacle)
     {
@@ -77,6 +76,7 @@ public class SecurityRobot : Robot
         isHoldingObstacle = true;
         endX = securedLocation.x;
         endY = securedLocation.y;
+        queueBackTaskState = true;
         SendRequest();
     }
 
@@ -102,6 +102,7 @@ public class SecurityRobot : Robot
 
         isHoldingObstacle = false;
         isDestroying = false;
+        queueBackTaskState = false;
         currentState = RobotState.Moving;
     }
 }

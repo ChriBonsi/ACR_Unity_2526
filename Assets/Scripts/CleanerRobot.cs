@@ -28,10 +28,10 @@ public class CleanerRobot : Robot
     {
     }
 
-    protected override bool IsTaskInterruptible()
+    /* protected override bool IsTaskInterruptible()
     {
         return true; 
-    }
+    } */
 
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {

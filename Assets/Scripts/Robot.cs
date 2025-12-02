@@ -31,6 +31,8 @@ public class Robot : MonoBehaviour
     private List<GameObject> reportedObstacles = new();
     protected GameObject icon;
     private GameObject currentRobotObstacle = null;
+    protected bool queueBackTaskState = false;
+    private float trackerTimer = 0f;
 
     void Start()
     {
@@ -60,6 +62,8 @@ public class Robot : MonoBehaviour
             return;
         }
 
+        SendTrackingData();
+
         if(currentState == RobotState.Moving)
         {
             CheckSensors();
@@ -88,10 +92,10 @@ public class Robot : MonoBehaviour
 
     protected virtual int GetPriority() { return 0; }
 
-    /* private void SendTrackingData()
+    private void SendTrackingData()
     {
         trackerTimer += Time.deltaTime;
-        if (trackerTimer >= trackerInterval)
+        if (trackerTimer >= 1f)
         {
             var trackerMsg = new RobotManagerTrackerSubscriberMsg()
             {
@@ -109,14 +113,14 @@ public class Robot : MonoBehaviour
                 perception_radius = perceptionRadius,
                 obstacle_distance_threshold = obstacleDistanceThreshold,
                 loop = loop,
-                obstacle_detected = obstacleDetected,
-                performing_task = isPerformingTask
+                obstacle_detected = false,
+                performing_task = false
             };
             //Debug.Log($"[Robot {robotId}] Sent tracking data.");
             RobotManagerClient.SendTrackingData(trackerMsg);
             trackerTimer = 0f;
         }
-    } */
+    }
 
     private void CheckAndAskForNewPath()
     {
@@ -226,15 +230,7 @@ public class Robot : MonoBehaviour
     private void HandleStaticObstacle(GameObject objectHit)
     {
         if(HandleSpecialObstacle(objectHit)) return;
-        if (currentState == RobotState.HandlingObstacle && !IsTaskInterruptible())
-        {
-            Debug.Log($"[Robot {robotId}] Static obstacle detected during critical task. Stopping until clear.");
-            currentRobotObstacle = objectHit; 
-            currentState = RobotState.Yielding; 
-            return;
-        }
         ReportObstacle(objectHit, "unhandled");
-        currentState = RobotState.WaitingForPath;
         SendRequest();
     }
 
@@ -243,15 +239,10 @@ public class Robot : MonoBehaviour
         if (currentRobotObstacle == null || 
         Vector3.Distance(transform.position, currentRobotObstacle.transform.position) > perceptionRadius + 0.5f)
         {
-            currentState = RobotState.Moving;
+            currentState = !queueBackTaskState ? RobotState.Moving : RobotState.HandlingObstacle;
             currentRobotObstacle = null;
             Debug.Log($"[Robot {robotId}] Yield clear. Resuming movement.");
         }
-    }
-
-    protected virtual bool IsTaskInterruptible()
-    {
-        return true; 
     }
 
     protected void ReportObstacle(GameObject obstacle, string status)
@@ -291,6 +282,9 @@ public class Robot : MonoBehaviour
     public void SendRequest()
     {
         if (isPathRequestPending) return;
+        //if(currentState == RobotState.HandlingObstacle) queueBackTaskState = true;
+        currentState = RobotState.WaitingForPath;
+
         float currentX = transform.position.x;
         float currentY = transform.position.y;
         var req = new PathPlannerRequestMsg()
@@ -331,7 +325,7 @@ public class Robot : MonoBehaviour
         }
 
         isPathRequestPending = false;
-        if (currentState != RobotState.HandlingObstacle) currentState = RobotState.Moving;
+        currentState = !queueBackTaskState ? RobotState.Moving : RobotState.HandlingObstacle;
         //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
     }
 }
