@@ -63,6 +63,8 @@ public class MapGenerator : MonoBehaviour
             Vector3 position = new(node.x, node.y);
             GameObject tile = Instantiate(tilePrefab, position, Quaternion.identity, mapParent.transform);
 
+            tile.name = $"Tile_{node.id}_({node.x},{node.y})";
+
             Color tileColor = Color.gray;
             tileColor = node.type switch
             {

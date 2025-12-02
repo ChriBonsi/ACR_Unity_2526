@@ -62,6 +62,7 @@ public class RobotManagerClient : MonoBehaviour
         robot.perceptionRadius = msg.perception_radius;
         robot.obstacleDistanceThreshold = msg.obstacle_distance_threshold;
         robot.robotType = msg.robot_type;
+        robotInstance.name = $"{msg.robot_type}_robot_{msg.robot_id}";
     }
 
     public static void SendTrackingData(RobotManagerTrackerSubscriberMsg msg)
