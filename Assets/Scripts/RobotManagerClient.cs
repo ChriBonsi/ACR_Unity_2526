@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.RobotManager;
 using System.Collections.Generic;
+using RosMessageTypes.Std;
 
 public class RobotManagerClient : MonoBehaviour
 {
@@ -13,17 +14,17 @@ public class RobotManagerClient : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
 
-        ros.Subscribe<RobotManagerRobotPublisherMsg>("robot_manager/publish_robot", SpawnRobots);
+        ros.Subscribe<RobotManagerRobotMsg>("robot_manager/publish_robot", SpawnRobots);
 
-        var subscribeMsg = new RobotManagerRobotSubscriberMsg()
+        var subscribeMsg = new StringMsg()
         {
-            state = "ready"
+            data = "ready"
         };
 
         ros.Publish("robot_manager/request_robot", subscribeMsg);
     }
 
-    private void SpawnRobots(RobotManagerRobotPublisherMsg msg)
+    private void SpawnRobots(RobotManagerRobotMsg msg)
     {
         Debug.Log($"[RobotManagerClient] Spawning robot {msg.robot_id} of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
         GameObject robotInstance = Instantiate(robotPrefab, robotParent.transform);
@@ -51,7 +52,7 @@ public class RobotManagerClient : MonoBehaviour
         robotInstance.name = $"{msg.robot_type}_robot_{msg.robot_id}";
     }
 
-    public static void SendTrackingData(RobotManagerTrackerSubscriberMsg msg)
+    public static void SendTrackingData(RobotManagerTrackerMsg msg)
     {
         ros.Publish("robot_manager/subscribe_tracker", msg);
         //Debug.Log($"[RobotManagerClient] Published tracking data for Robot ID: {msg.robot_id}");

@@ -3,6 +3,7 @@ using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.PathPlanner;
 using System.Collections.Generic;
 using RosMessageTypes.RobotManager;
+using System;
 
 public class Robot : MonoBehaviour
 {
@@ -30,12 +31,14 @@ public class Robot : MonoBehaviour
     protected bool queueBackTaskState = false;
     private float trackerTimer = 0f;
     protected ObstacleManager obstacleManager;
+    private bool needCharge = false;
 
     void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
+        //ros.Subscribe<RobotManagerBatteryMsg>()
 
         obstacleManager = new(robotId);
 
@@ -59,6 +62,13 @@ public class Robot : MonoBehaviour
         {
             // Request battery change
             return;
+        }
+
+        if(battery < 10f && !needCharge)
+        {
+            Debug.LogWarning($"[Robot {robotId}] Battery low: {battery}%, going to recharge.");
+            needCharge = true;
+
         }
 
         //SendTrackingData();
@@ -96,7 +106,7 @@ public class Robot : MonoBehaviour
         trackerTimer += Time.deltaTime;
         if (trackerTimer >= 1f)
         {
-            var trackerMsg = new RobotManagerTrackerSubscriberMsg()
+            var trackerMsg = new RobotManagerTrackerMsg()
             {
                 robot_id = robotId,
                 current_x = transform.position.x,

@@ -8,9 +8,9 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.ObstacleManager
 {
     [Serializable]
-    public class ObstacleManagerObstacleReportMsg : Message
+    public class ObstacleManagerReportMsg : Message
     {
-        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerObstacleReport";
+        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerReport";
         public override string RosMessageName => k_RosMessageName;
 
         public float x;
@@ -21,7 +21,7 @@ namespace RosMessageTypes.ObstacleManager
         public float scale_y;
         public string id;
 
-        public ObstacleManagerObstacleReportMsg()
+        public ObstacleManagerReportMsg()
         {
             this.x = 0.0f;
             this.y = 0.0f;
@@ -32,7 +32,7 @@ namespace RosMessageTypes.ObstacleManager
             this.id = "";
         }
 
-        public ObstacleManagerObstacleReportMsg(float x, float y, string type, string status, float scale_x, float scale_y, string id)
+        public ObstacleManagerReportMsg(float x, float y, string type, string status, float scale_x, float scale_y, string id)
         {
             this.x = x;
             this.y = y;
@@ -43,9 +43,9 @@ namespace RosMessageTypes.ObstacleManager
             this.id = id;
         }
 
-        public static ObstacleManagerObstacleReportMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerObstacleReportMsg(deserializer);
+        public static ObstacleManagerReportMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerReportMsg(deserializer);
 
-        private ObstacleManagerObstacleReportMsg(MessageDeserializer deserializer)
+        private ObstacleManagerReportMsg(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.x);
             deserializer.Read(out this.y);
@@ -69,7 +69,7 @@ namespace RosMessageTypes.ObstacleManager
 
         public override string ToString()
         {
-            return "ObstacleManagerObstacleReportMsg: " +
+            return "ObstacleManagerReportMsg: " +
             "\nx: " + x.ToString() +
             "\ny: " + y.ToString() +
             "\ntype: " + type.ToString() +

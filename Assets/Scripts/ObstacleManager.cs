@@ -14,7 +14,7 @@ public class ObstacleManager
     {
         this.robotId = robotId;
         ros = ROSConnection.GetOrCreateInstance();
-        ros.Subscribe<ObstacleManagerObstacleReportMsg>("obstacle_manager/report_obstacle", SubscribeCallback);
+        ros.Subscribe<ObstacleManagerReportMsg>("obstacle_manager/report_obstacle", SubscribeCallback);
         obstacles = new();
         obstacleContainer = GameObject.Find("Obstacles");
     }
@@ -50,7 +50,7 @@ public class ObstacleManager
     {
         Debug.Log($"[Robot {robotId}] Publishing obstacle {obstacle.GetInstanceID()} to all robots.");
         Transform transform = obstacle.transform;
-        var msg = new ObstacleManagerObstacleReportMsg
+        var msg = new ObstacleManagerReportMsg
         {
             id = obstacle.GetInstanceID().ToString(),
             x = transform.position.x,
@@ -63,7 +63,7 @@ public class ObstacleManager
         ros.Publish("obstacle_manager/report_obstacle", msg);
     }
 
-    private void SubscribeCallback(ObstacleManagerObstacleReportMsg msg)
+    private void SubscribeCallback(ObstacleManagerReportMsg msg)
     {
         Debug.Log($"[Robot {robotId}] Received obstacle report for obstacle ID {msg.id} with status {msg.status}.");
         GameObject gameObject = GameObject.Find(msg.id);
