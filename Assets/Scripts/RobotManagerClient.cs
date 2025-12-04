@@ -20,26 +20,12 @@ public class RobotManagerClient : MonoBehaviour
             state = "ready"
         };
 
-        /* var req = new ObstacleManagerSubscriberMsg()
-        {
-            x = 6,
-            y = 6,
-            type = "DirtObstacle",
-        };
-        ros.Publish("obstacle_manager/report_obstacle", req); */
-
         ros.Publish("robot_manager/request_robot", subscribeMsg);
-    }
-
-    void Update()
-    {
-
     }
 
     private void SpawnRobots(RobotManagerRobotPublisherMsg msg)
     {
-        Debug.Log("Spawning robot with ID: " + msg.robot_id);
-        Debug.Log($"[RobotManagerClient] Spawning robot of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
+        Debug.Log($"[RobotManagerClient] Spawning robot {msg.robot_id} of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
         GameObject robotInstance = Instantiate(robotPrefab, robotParent.transform);
         Robot robot = msg.robot_type switch
         {

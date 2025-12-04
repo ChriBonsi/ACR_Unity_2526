@@ -3,7 +3,12 @@ using System.Collections;
 
 public class SecurityRobot : Robot
 {
-    private Vector3 securedLocation = new(6, 11, 0);
+    private readonly Vector3[] securedLocations = new Vector3[]
+    {
+        new(2, 27),
+        new(27, 2),
+    };
+    private Vector3 securedLocation;
     private bool isDestroying = false;
     private bool isHoldingObstacle = false;
 
@@ -50,10 +55,23 @@ public class SecurityRobot : Robot
         }
     }
 
-    /* protected override bool IsTaskInterruptible()
+    private void GetClosestSecuredLocation()
     {
-        return !isHoldingObstacle; 
-    } */
+        float minDistance = float.PositiveInfinity;
+        Vector3 closest = Vector3.zero;
+
+        foreach (var location in securedLocations)
+        {
+            float distance = Vector3.Distance(transform.position, location);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                closest = location;
+            }
+        }
+
+        securedLocation = closest;
+    }
 
     private IEnumerator PickupRoutine(GameObject obstacle)
     {
@@ -70,9 +88,11 @@ public class SecurityRobot : Robot
         obstacle.GetComponent<BoxCollider2D>().enabled = false;
 
         obstacle.transform.SetParent(transform);
+        obstacle.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
         obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
-        ReportObstacle(obstacle, "handled");
+        obstacleManager.ReportObstacle(obstacle, "handled");
+        GetClosestSecuredLocation();
         isHoldingObstacle = true;
         endX = securedLocation.x;
         endY = securedLocation.y;

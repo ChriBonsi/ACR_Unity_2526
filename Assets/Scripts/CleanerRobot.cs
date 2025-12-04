@@ -28,11 +28,6 @@ public class CleanerRobot : Robot
     {
     }
 
-    /* protected override bool IsTaskInterruptible()
-    {
-        return true; 
-    } */
-
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
         Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
@@ -45,7 +40,7 @@ public class CleanerRobot : Robot
         icon.SetActive(false);
 
         Destroy(obstacle);
-        ReportObstacle(obstacle, "handled");
+        obstacleManager.ReportObstacle(obstacle, "handled");
 
         currentState = RobotState.Moving;
     }
