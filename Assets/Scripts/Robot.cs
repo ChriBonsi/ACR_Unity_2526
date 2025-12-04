@@ -2,7 +2,6 @@ using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.PathPlanner;
 using System.Collections.Generic;
-using RosMessageTypes.ObstacleManager;
 using RosMessageTypes.RobotManager;
 
 public class Robot : MonoBehaviour
@@ -17,8 +16,6 @@ public class Robot : MonoBehaviour
     public bool loop = false;
     public float battery = 100f;
     public RobotState currentState = RobotState.Moving;
-
-    [Header("Request")]
     public float endX = 3;
     public float endY = 3;
 
@@ -28,17 +25,19 @@ public class Robot : MonoBehaviour
     protected bool isPathRequestPending = false;
     private float startX;
     private float startY;
-    private List<GameObject> reportedObstacles = new();
     protected GameObject icon;
     private GameObject currentRobotObstacle = null;
     protected bool queueBackTaskState = false;
     private float trackerTimer = 0f;
+    protected ObstacleManager obstacleManager;
 
     void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
+
+        obstacleManager = new(robotId);
 
         icon = transform.Find("TaskIcon").gameObject;
         icon.SetActive(false);
@@ -62,7 +61,7 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        SendTrackingData();
+        //SendTrackingData();
 
         if(currentState == RobotState.Moving)
         {
@@ -230,7 +229,7 @@ public class Robot : MonoBehaviour
     private void HandleStaticObstacle(GameObject objectHit)
     {
         if(HandleSpecialObstacle(objectHit)) return;
-        ReportObstacle(objectHit, "unhandled");
+        obstacleManager.ReportObstacle(objectHit, "unhandled");
         SendRequest();
     }
 
@@ -243,25 +242,6 @@ public class Robot : MonoBehaviour
             currentRobotObstacle = null;
             Debug.Log($"[Robot {robotId}] Yield clear. Resuming movement.");
         }
-    }
-
-    protected void ReportObstacle(GameObject obstacle, string status)
-    {
-        if(status == "handled") reportedObstacles.Remove(obstacle);
-        if (reportedObstacles.Contains(obstacle)) return;
-        var req = new ObstacleManagerObstacleReportMsg()
-        {
-            x = obstacle.transform.position.x,
-            y = obstacle.transform.position.y,
-            type = obstacle.tag,
-            status = status,
-            scale_x = obstacle.transform.localScale.x,
-            scale_y = obstacle.transform.localScale.y,
-            id = obstacle.GetInstanceID().ToString()
-        };
-        ros.Publish("obstacle_manager/report_obstacle", req);
-        if(status != "handled") reportedObstacles.Add(obstacle);
-        Debug.Log($"[Robot {robotId}] Reported obstacle {obstacle.GetInstanceID()}, ({obstacle.transform.position.x}, {obstacle.transform.position.y}) to Obstacle Manager.");
     }
 
     protected void UpdateBattery(float amount)
