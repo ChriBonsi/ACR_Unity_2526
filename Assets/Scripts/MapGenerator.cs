@@ -68,12 +68,20 @@ public class MapGenerator : MonoBehaviour
             Color tileColor = Color.gray;
             tileColor = node.type switch
             {
-                0 => Color.red,
-                1 => Color.green,
-                2 => Color.darkGreen,
-                3 => Color.yellow,
-                4 => Color.purple,
-                _ => Color.gray,
+                0 => Color.black,
+                1 => Color.red,
+                2 => Color.brown,
+                22 => Color.burlywood,
+                3 => Color.skyBlue,
+                33 => Color.cyan,
+                4 => Color.gray,
+                44 => Color.gray,
+                5 => Color.darkGray,
+                55 => Color.darkGray,
+                6 => Color.lightGreen,
+                7 => Color.green,
+                9 => Color.yellow,
+                _ => Color.pink,
             };
             if (tile.TryGetComponent<Renderer>(out var rend))
             {
