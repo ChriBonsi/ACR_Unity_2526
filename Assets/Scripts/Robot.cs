@@ -31,14 +31,14 @@ public class Robot : MonoBehaviour
     protected bool queueBackTaskState = false;
     private float trackerTimer = 0f;
     protected ObstacleManager obstacleManager;
-    private bool needCharge = false;
+    private bool chargeLock = false;
+    private readonly float chargeRate = 20f;
 
     void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
-        //ros.Subscribe<RobotManagerBatteryMsg>()
 
         obstacleManager = new(robotId);
 
@@ -64,11 +64,11 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        if(battery < 10f && !needCharge)
+        if(battery < 10f && !chargeLock)
         {
-            Debug.LogWarning($"[Robot {robotId}] Battery low: {battery}%, going to recharge.");
-            needCharge = true;
-
+            Debug.LogWarning($"[Robot {robotId}] Battery low: {battery}%, requesting recharge.");
+            SendBatteryRechargeRequest();
+            return;
         }
 
         //SendTrackingData();
@@ -81,7 +81,9 @@ public class Robot : MonoBehaviour
         switch (currentState)
         {
             case RobotState.Moving:
+            //CheckSensors();
             Move();
+            if(CheckIfChargingStationReached()) break;
             CheckIfQueuedPointReached();
             if(pathQueue.Count == 0)
             {
@@ -91,10 +93,13 @@ public class Robot : MonoBehaviour
             case RobotState.Yielding:
             CheckIfYieldIsDone();
             break;
-            case RobotState.HandlingObstacle:
+            case RobotState.PerformingTask:
             UpdateTask();
             break;
             case RobotState.WaitingForPath:
+            break;
+            case RobotState.Charging:
+            ChargeRobot();
             break;
         }
     }
@@ -131,6 +136,17 @@ public class Robot : MonoBehaviour
         }
     }
 
+    private void ChargeRobot()
+    {
+        UpdateBattery(chargeRate * Time.deltaTime);
+        if(battery >= 100f)
+        {
+            Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
+            SendRequest();
+            chargeLock = false;
+        }
+    }
+
     private void CheckAndAskForNewPath()
     {
         if (destinations.Count > 0 && !isPathRequestPending)
@@ -160,6 +176,20 @@ public class Robot : MonoBehaviour
         UpdateBattery(-moveSpeed * Time.deltaTime * 0.1f);
     }
 
+    protected bool CheckIfChargingStationReached()
+    {
+        if(!chargeLock) return false;
+        if(pathQueue.Count == 0) return false;
+        Vector3 lastPoint = pathQueue.ToArray()[pathQueue.Count - 1];
+        if(Vector3.Distance(transform.position, lastPoint) < 0.1f)
+        {
+            currentState = RobotState.Charging;
+            Debug.Log($"[Robot {robotId}] Reached charging station. Starting to charge.");
+            return true;
+        }
+        return false;
+    }
+
     protected void CheckIfQueuedPointReached()
     {
         if (pathQueue.Count == 0) return;
@@ -187,7 +217,7 @@ public class Robot : MonoBehaviour
 
         if (hits.Length == 0) return;
 
-        System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
+        Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
 
         foreach (var hit in hits)
         {
@@ -248,7 +278,7 @@ public class Robot : MonoBehaviour
         if (currentRobotObstacle == null || 
         Vector3.Distance(transform.position, currentRobotObstacle.transform.position) > perceptionRadius + 0.5f)
         {
-            currentState = !queueBackTaskState ? RobotState.Moving : RobotState.HandlingObstacle;
+            currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
             currentRobotObstacle = null;
             Debug.Log($"[Robot {robotId}] Yield clear. Resuming movement.");
         }
@@ -269,7 +299,23 @@ public class Robot : MonoBehaviour
     {
     }
 
-    public void SendRequest()
+    protected void SetNextClosestDestination()
+    {
+        int idx = -1;
+        float minDistance = float.PositiveInfinity;
+        for (int i = 0; i < destinations.Count; i++)
+        {
+            float distance = Vector3.Distance(transform.position, destinations[i]);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                idx = i;        
+            }
+        }
+        destinationIndex = (idx - 1) % destinations.Count;
+    }
+
+    protected void SendRequest()
     {
         if (isPathRequestPending) return;
         //if(currentState == RobotState.HandlingObstacle) queueBackTaskState = true;
@@ -291,7 +337,28 @@ public class Robot : MonoBehaviour
         Debug.Log($"[Robot {robotId}] Sent path request: ({currentX},{currentY}), ({endX},{endY})");
     }
 
-    void ResultCallback(PathPlannerResponseMsg res)
+    private void SendBatteryRechargeRequest()
+    {
+        if (isPathRequestPending) return;
+        currentState = RobotState.WaitingForPath;
+
+        float currentX = transform.position.x;
+        float currentY = transform.position.y;
+
+        var req = new PathPlannerBatteryRequestMsg()
+        {
+            robot_id = robotId,
+            start_x = currentX,
+            start_y = currentY,
+        };
+
+        ros.Publish("path_planner/battery_request", req);
+        isPathRequestPending = true;
+        chargeLock = true;
+        Debug.Log($"[Robot {robotId}] Sent battery recharge path request.");
+    }
+
+    private void ResultCallback(PathPlannerResponseMsg res)
     {
         if (res.robot_id != robotId) return;
 
@@ -315,7 +382,7 @@ public class Robot : MonoBehaviour
         }
 
         isPathRequestPending = false;
-        currentState = !queueBackTaskState ? RobotState.Moving : RobotState.HandlingObstacle;
+        currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
         //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
     }
 }

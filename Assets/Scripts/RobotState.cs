@@ -2,6 +2,7 @@ public enum RobotState
 {
     Moving,
     Yielding,
-    HandlingObstacle,
-    WaitingForPath
+    PerformingTask,
+    WaitingForPath,
+    Charging
 }

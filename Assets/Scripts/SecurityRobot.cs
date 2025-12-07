@@ -19,13 +19,13 @@ public class SecurityRobot : Robot
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
-        if(currentState == RobotState.HandlingObstacle) return false;
+        if(currentState == RobotState.PerformingTask) return false;
 
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
             if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f)
             {
-                if (currentState != RobotState.HandlingObstacle)
+                if (currentState != RobotState.PerformingTask)
                 {
                     StartCoroutine(PickupRoutine(objectHit));
                 }
@@ -37,7 +37,7 @@ public class SecurityRobot : Robot
 
     protected override void UpdateTask()
     {
-        if (currentState != RobotState.HandlingObstacle) return;
+        if (currentState != RobotState.PerformingTask) return;
 
         if (isHoldingObstacle)
         {
@@ -50,6 +50,7 @@ public class SecurityRobot : Robot
             else
             {
                 Move();
+                if(CheckIfChargingStationReached()) return;
                 CheckIfQueuedPointReached();
             }
         }
@@ -75,7 +76,7 @@ public class SecurityRobot : Robot
 
     private IEnumerator PickupRoutine(GameObject obstacle)
     {
-        currentState = RobotState.HandlingObstacle;
+        currentState = RobotState.PerformingTask;
         pathQueue.Clear();
         Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle {obstacle.GetInstanceID()}...");
 
@@ -124,5 +125,6 @@ public class SecurityRobot : Robot
         isDestroying = false;
         queueBackTaskState = false;
         currentState = RobotState.Moving;
+        SetNextClosestDestination();
     }
 }

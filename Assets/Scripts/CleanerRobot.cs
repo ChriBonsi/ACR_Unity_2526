@@ -14,7 +14,7 @@ public class CleanerRobot : Robot
         {
             if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.1f)
             {
-                if (currentState != RobotState.HandlingObstacle)
+                if (currentState != RobotState.PerformingTask)
                 {
                     StartCoroutine(CleanDirtRoutine(objectHit));
                 }
@@ -31,7 +31,7 @@ public class CleanerRobot : Robot
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
     {
         Debug.Log($"[CleanerRobot {robotId}] Cleaning obstacle {obstacle.GetInstanceID()}...");
-        currentState = RobotState.HandlingObstacle;
+        currentState = RobotState.PerformingTask;
 
         icon.SetActive(true);
 
