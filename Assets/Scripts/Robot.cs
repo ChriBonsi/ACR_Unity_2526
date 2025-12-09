@@ -2,8 +2,8 @@ using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.PathPlanner;
 using System.Collections.Generic;
-using RosMessageTypes.ObstacleManager;
 using RosMessageTypes.RobotManager;
+using System;
 
 public class Robot : MonoBehaviour
 {
@@ -15,23 +15,24 @@ public class Robot : MonoBehaviour
     public string robotType = "default";
     public List<Vector3> destinations = new();
     public bool loop = false;
-
-    [Header("Request")]
+    public float battery = 100f;
+    public RobotState currentState = RobotState.Moving;
     public float endX = 3;
     public float endY = 3;
 
     protected ROSConnection ros;
-    protected Queue<Vector3> pathQueue = new();
-    protected bool obstacleDetected = false;
-    protected int destinationIndex = 0;
+    public Queue<Vector3> pathQueue = new();
+    protected int destinationIndex = 1;
     protected bool isPathRequestPending = false;
-    protected bool isPerformingTask = false;
-    private float trackerTimer = 0f;
-    private const float trackerInterval = 1f;
     private float startX;
     private float startY;
-    private List<GameObject> reportedObstacles = new();
-    protected GameObject lastAvoided;
+    protected GameObject icon;
+    private GameObject currentRobotObstacle = null;
+    protected bool queueBackTaskState = false;
+    private float trackerTimer = 0f;
+    protected ObstacleManager obstacleManager;
+    private bool chargeLock = false;
+    private readonly float chargeRate = 20f;
 
     void Start()
     {
@@ -39,52 +40,82 @@ public class Robot : MonoBehaviour
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", ResultCallback);
 
-        if (destinations.Count == 0) SendRequest();
+        obstacleManager = new(robotId);
 
-        perceptionRadius *= gameObject.transform.lossyScale.x;
+        icon = transform.Find("TaskIcon").gameObject;
+        icon.SetActive(false);
+
+        perceptionRadius *= transform.lossyScale.x;
+
+        destinationIndex = destinations.FindIndex(
+            v => v.x == endX && v.y == endY
+        );
+
+        SendRequest();
     }
 
     void Update()
     {
         if (gameObject == null) return;
 
-        SendTrackingData();
-
-        Vector3 target = Vector3.zero;
-        bool hasPath = pathQueue.Count > 0;
-        if (hasPath) target = pathQueue.Peek();
-
-        if (hasPath) 
+        if (battery <= 0f)
         {
-            CheckForObstacles(target);
-        }
-
-        UpdateTask();
-
-        if (isPerformingTask) return;
-
-        if (!hasPath)
-        {
-            CheckAndAskForNewPath();
+            // Request battery change
             return;
         }
 
-        if (obstacleDetected) return;
-        
-        Move(target);
-        CheckIfQueuedPointReached(target);
+        if(battery < 10f && !chargeLock)
+        {
+            Debug.LogWarning($"[Robot {robotId}] Battery low: {battery}%, requesting recharge.");
+            SendBatteryRechargeRequest();
+            return;
+        }
+
+        //SendTrackingData();
+
+        if(currentState == RobotState.Moving)
+        {
+            CheckSensors();
+        }
+
+        switch (currentState)
+        {
+            case RobotState.Moving:
+            //CheckSensors();
+            Move();
+            if(CheckIfChargingStationReached()) break;
+            CheckIfQueuedPointReached();
+            if(pathQueue.Count == 0)
+            {
+                CheckAndAskForNewPath();
+            }
+            break;
+            case RobotState.Yielding:
+            CheckIfYieldIsDone();
+            break;
+            case RobotState.PerformingTask:
+            UpdateTask();
+            break;
+            case RobotState.WaitingForPath:
+            break;
+            case RobotState.Charging:
+            ChargeRobot();
+            break;
+        }
     }
+
+    protected virtual int GetPriority() { return 0; }
 
     private void SendTrackingData()
     {
         trackerTimer += Time.deltaTime;
-        if (trackerTimer >= trackerInterval)
+        if (trackerTimer >= 1f)
         {
-            var trackerMsg = new RobotManagerTrackerSubscriberMsg()
+            var trackerMsg = new RobotManagerTrackerMsg()
             {
                 robot_id = robotId,
-                current_x = gameObject.transform.position.x,
-                current_y = gameObject.transform.position.y,
+                current_x = transform.position.x,
+                current_y = transform.position.y,
                 start_x = startX,
                 start_y = startY,
                 end_x = endX,
@@ -96,121 +127,167 @@ public class Robot : MonoBehaviour
                 perception_radius = perceptionRadius,
                 obstacle_distance_threshold = obstacleDistanceThreshold,
                 loop = loop,
-                obstacle_detected = obstacleDetected,
-                performing_task = isPerformingTask
-            };            
-            Debug.Log($"[Robot {robotId}] Sent tracking data.");
+                obstacle_detected = false,
+                performing_task = false
+            };
+            //Debug.Log($"[Robot {robotId}] Sent tracking data.");
             RobotManagerClient.SendTrackingData(trackerMsg);
             trackerTimer = 0f;
         }
     }
 
+    private void ChargeRobot()
+    {
+        UpdateBattery(chargeRate * Time.deltaTime);
+        if(battery >= 100f)
+        {
+            Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
+            SendRequest();
+            chargeLock = false;
+        }
+    }
+
     private void CheckAndAskForNewPath()
     {
-        if (loop && !isPathRequestPending)
+        if (destinations.Count > 0 && !isPathRequestPending)
         {
-            startX = destinations[destinationIndex].x;
-            startY = destinations[destinationIndex].y;
-            destinationIndex = (destinationIndex + 1) % destinations.Count;
-            endX = destinations[destinationIndex].x;
-            endY = destinations[destinationIndex].y;
+            if (loop)
+            {
+                destinationIndex = (destinationIndex + 1) % destinations.Count;
+            }
+            else
+            {
+                if (destinationIndex >= destinations.Count - 1) return;
+                destinationIndex++;
+            }
+            Vector3 nextDestination = destinations[destinationIndex];
+            endX = nextDestination.x;
+            endY = nextDestination.y;
             SendRequest();
         }
     }
 
-    protected void Move(Vector3 target)
+    protected void Move()
     {
-        gameObject.transform.position =
-            Vector3.MoveTowards(gameObject.transform.position, target, moveSpeed * Time.deltaTime);
+        if (pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        transform.position =
+            Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+        UpdateBattery(-moveSpeed * Time.deltaTime * 0.1f);
     }
 
-    protected void CheckIfQueuedPointReached(Vector3 target)
+    protected bool CheckIfChargingStationReached()
     {
-        if (Vector3.Distance(gameObject.transform.position, target) < 0.02f)
+        if(!chargeLock) return false;
+        if(pathQueue.Count == 0) return false;
+        Vector3 lastPoint = pathQueue.ToArray()[pathQueue.Count - 1];
+        if(Vector3.Distance(transform.position, lastPoint) < 0.1f)
+        {
+            currentState = RobotState.Charging;
+            Debug.Log($"[Robot {robotId}] Reached charging station. Starting to charge.");
+            return true;
+        }
+        return false;
+    }
+
+    protected void CheckIfQueuedPointReached()
+    {
+        if (pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        if (Vector3.Distance(transform.position, target) < 0.02f)
         {
             pathQueue.Dequeue();
         }
     }
 
-    private void CheckForObstacles(Vector3 target)
+    protected void CheckSensors()
     {
-        RaycastHit2D[] hits = Physics2D.CircleCastAll(gameObject.transform.position, perceptionRadius, target - gameObject.transform.position,
-            Vector3.Distance(gameObject.transform.position, target));
-        
-        obstacleDetected = false;
+        if(pathQueue.Count == 0) return;
+        Vector3 target = pathQueue.Peek();
+        Vector3 currentPosition = transform.position;
+        Vector2 direction = target - currentPosition;
+        if(direction == Vector2.zero) return;
+
+        RaycastHit2D[] hits = Physics2D.CircleCastAll(
+            currentPosition,
+            0.5f,
+            direction.normalized,
+            Vector3.Distance(currentPosition, target)
+        );
 
         if (hits.Length == 0) return;
 
-        System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
-        
+        Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
+
         foreach (var hit in hits)
         {
-            GameObject objectHit = hit.collider != null ? hit.collider.gameObject : null;
+            if(hit.collider == null) continue;
+            GameObject objectHit = hit.collider.gameObject;
             if (objectHit == null || objectHit == gameObject) continue;
-            if (hit.distance > obstacleDistanceThreshold) continue;
-            if (HandleSpecialObstacle(objectHit)) continue;
-            if (obstacleDetected) return;
-            ReportObstacle(objectHit);
-            obstacleDetected = true;
-            return;
+
+            // Dynamic robot-robot
+            if(objectHit.CompareTag("Robot"))
+            {
+                Robot otherRobot = objectHit.GetComponent<Robot>();
+                HandleRobotInteraction(otherRobot, hit.distance);
+                return;
+            }
+
+            if(hit.distance <= obstacleDistanceThreshold)
+            {
+                HandleStaticObstacle(objectHit);
+                return;
+            }
         }
     }
 
-    protected void ReportObstacle(GameObject obstacle)
+    private void HandleRobotInteraction(Robot otherRobot, float distance)
     {
-        if (reportedObstacles.Contains(obstacle)) return;
-        var req = new ObstacleManagerSubscriberMsg()
+        if(distance > obstacleDistanceThreshold + 0.5f) return;
+
+        int myPriority = GetPriority();
+        int otherPriority = otherRobot.GetPriority();
+        bool yield = false;
+
+        if (myPriority < otherPriority) 
         {
-            x = obstacle.transform.position.x,
-            y = obstacle.transform.position.y,
-            type = obstacle.tag
-        };
-        ros.Publish("obstacle_manager/report_obstacle", req);
-        reportedObstacles.Add(obstacle);
-        Debug.Log($"[Robot {robotId}] Reported obstacle at ({req.x}, {req.y}) to Obstacle Manager.");
+            yield = true;
+        }
+        else if (myPriority == otherPriority)
+        {
+            if (robotId > otherRobot.robotId) yield = true;
+        }
+
+        if (yield)
+        {
+            Debug.Log($"[Robot {robotId}] Yielding to Robot {otherRobot.robotId}.");
+            currentRobotObstacle = otherRobot.gameObject;
+            currentState = RobotState.Yielding;
+        }
     }
 
-    protected void PerformSideStep(GameObject obstacle)
+    private void HandleStaticObstacle(GameObject objectHit)
     {
-        if (lastAvoided == obstacle) return;
-        lastAvoided = obstacle;
+        if(HandleSpecialObstacle(objectHit)) return;
+        obstacleManager.ReportObstacle(objectHit, "unhandled");
+        SendRequest();
+    }
 
-        List<Vector3> oldPath = new(pathQueue);
-        pathQueue.Clear();
-        
-        Vector3 robotPos = transform.position;
-        Vector3 obstaclePos = obstacle.transform.position;
-        Vector3 toObstacle = obstaclePos - robotPos;
-        Vector3 forwardDir = toObstacle.normalized;
-        float distToObstacle = toObstacle.magnitude;
-        
-        Vector3 sideDir = Vector3.Cross(forwardDir, Vector3.forward);
-        
-        float sideOffset = 0.2f;
-        float clearance = obstacle.transform.localScale.x;
-
-        Vector3 pos1 = robotPos + sideDir * sideOffset;
-        Vector3 pos2 = pos1 + forwardDir * (distToObstacle + clearance);
-        Vector3 pos3 = pos2 - sideDir * sideOffset;
-
-        float reentryProgress = Vector3.Dot(pos3 - robotPos, forwardDir);
-         List<Vector3> newPath = new()
+    private void CheckIfYieldIsDone()
+    {
+        if (currentRobotObstacle == null || 
+        Vector3.Distance(transform.position, currentRobotObstacle.transform.position) > perceptionRadius + 0.5f)
         {
-            pos1,
-            pos2,
-            pos3
-        };
-
-        foreach (var pt in oldPath)
-        {
-            if (Vector3.Distance(pt, obstaclePos) < clearance) continue;
-            float ptProgress = Vector3.Dot(pt - robotPos, forwardDir);
-            if (ptProgress < reentryProgress) continue;
-            newPath.Add(pt);
+            currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
+            currentRobotObstacle = null;
+            Debug.Log($"[Robot {robotId}] Yield clear. Resuming movement.");
         }
-        
-        foreach (var p in newPath) pathQueue.Enqueue(p);
-        Debug.Log($"[CleanerRobot {robotId}] Side-stepping unattended package at {obstacle.transform.position}.");
+    }
+
+    protected void UpdateBattery(float amount)
+    {
+        //Debug.Log($"[Robot {robotId}] Battery changed by {amount}.");
+        battery = Mathf.Clamp(battery + amount, 0f, 100f);
     }
 
     protected virtual bool HandleSpecialObstacle(GameObject objectHit)
@@ -220,12 +297,30 @@ public class Robot : MonoBehaviour
 
     protected virtual void UpdateTask()
     {
-        
     }
 
-    public void SendRequest()
+    protected void SetNextClosestDestination()
     {
-        Transform transform = gameObject.transform;
+        int idx = -1;
+        float minDistance = float.PositiveInfinity;
+        for (int i = 0; i < destinations.Count; i++)
+        {
+            float distance = Vector3.Distance(transform.position, destinations[i]);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                idx = i;        
+            }
+        }
+        destinationIndex = (idx - 1) % destinations.Count;
+    }
+
+    protected void SendRequest()
+    {
+        if (isPathRequestPending) return;
+        //if(currentState == RobotState.HandlingObstacle) queueBackTaskState = true;
+        currentState = RobotState.WaitingForPath;
+
         float currentX = transform.position.x;
         float currentY = transform.position.y;
         var req = new PathPlannerRequestMsg()
@@ -242,17 +337,39 @@ public class Robot : MonoBehaviour
         Debug.Log($"[Robot {robotId}] Sent path request: ({currentX},{currentY}), ({endX},{endY})");
     }
 
-    void ResultCallback(PathPlannerResponseMsg res)
+    private void SendBatteryRechargeRequest()
+    {
+        if (isPathRequestPending) return;
+        currentState = RobotState.WaitingForPath;
+
+        float currentX = transform.position.x;
+        float currentY = transform.position.y;
+
+        var req = new PathPlannerBatteryRequestMsg()
+        {
+            robot_id = robotId,
+            start_x = currentX,
+            start_y = currentY,
+        };
+
+        ros.Publish("path_planner/battery_request", req);
+        isPathRequestPending = true;
+        chargeLock = true;
+        Debug.Log($"[Robot {robotId}] Sent battery recharge path request.");
+    }
+
+    private void ResultCallback(PathPlannerResponseMsg res)
     {
         if (res.robot_id != robotId) return;
 
         if (!res.success)
         {
-            Debug.LogWarning($"[Robot {robotId}] Path planning failed.");
+            Debug.LogError($"[Robot {robotId}] Path planning failed.");
+            isPathRequestPending = false;
             return;
         }
 
-        //pathQueue.Clear();
+        pathQueue.Clear();
 
         for (int i = 0; i < res.path_x.Length; i++)
         {
@@ -261,13 +378,11 @@ public class Robot : MonoBehaviour
                 res.path_y[i],
                 0f
             );
-            //if (Vector3.Distance(robot.transform.position, point) < 0.05f) continue;
-
             pathQueue.Enqueue(point);
         }
 
-        lastAvoided = null;
         isPathRequestPending = false;
-        Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
+        currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
+        //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
     }
 }

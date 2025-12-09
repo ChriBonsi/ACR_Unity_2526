@@ -1,72 +1,116 @@
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
 public class SecurityRobot : Robot
 {
-    private Vector3 securedLocation = new(9, 1, 0);
+    private readonly Vector3[] securedLocations = new Vector3[]
+    {
+        new(2, 27),
+        new(27, 2),
+    };
+    private Vector3 securedLocation;
     private bool isDestroying = false;
+    private bool isHoldingObstacle = false;
+
+    protected override int GetPriority()
+    {
+        return 2;
+    }
+
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
+        if(currentState == RobotState.PerformingTask) return false;
+
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
-            if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.5f)
+            if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.2f)
             {
-                if (!isPerformingTask)
+                if (currentState != RobotState.PerformingTask)
                 {
                     StartCoroutine(PickupRoutine(objectHit));
                 }
-                obstacleDetected = true;
             }
-            ReportObstacle(objectHit);
             return true;
         }
-
         return false;
-    }
-
-    private IEnumerator PickupRoutine(GameObject unattended)
-    {
-        isPerformingTask = true;
-        pathQueue.Clear();
-        Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle at {unattended.transform.position}...");
-
-        yield return new WaitForSeconds(2f);
-
-        if (unattended != null)
-        {
-            unattended.transform.SetParent(transform);
-            unattended.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-        }
-
-        endX = securedLocation.x;
-        endY = securedLocation.y;
-        SendRequest();
     }
 
     protected override void UpdateTask()
     {
-        if (!isPerformingTask) return;
-        if (isPathRequestPending) return;
+        if (currentState != RobotState.PerformingTask) return;
 
-        if (pathQueue.Count > 0)
+        if (isHoldingObstacle)
         {
-            Vector3 target = pathQueue.Peek();
-            Move(target);
-            CheckIfQueuedPointReached(target);
+            CheckSensors();
+
+            if (Vector3.Distance(transform.position, securedLocation) < 0.1f)
+            {
+                if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
+            }
+            else
+            {
+                Move();
+                if(CheckIfChargingStationReached()) return;
+                CheckIfQueuedPointReached();
+            }
         }
-        else if (Vector3.Distance(transform.position, securedLocation) < 0.5f)
+    }
+
+    private void GetClosestSecuredLocation()
+    {
+        float minDistance = float.PositiveInfinity;
+        Vector3 closest = Vector3.zero;
+
+        foreach (var location in securedLocations)
         {
-            if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
+            float distance = Vector3.Distance(transform.position, location);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                closest = location;
+            }
         }
+
+        securedLocation = closest;
+    }
+
+    private IEnumerator PickupRoutine(GameObject obstacle)
+    {
+        currentState = RobotState.PerformingTask;
+        pathQueue.Clear();
+        Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle {obstacle.GetInstanceID()}...");
+
+        icon.SetActive(true);
+
+        yield return new WaitForSeconds(2f);
+
+        icon.SetActive(false);
+
+        obstacle.GetComponent<BoxCollider2D>().enabled = false;
+
+        obstacle.transform.SetParent(transform);
+        obstacle.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
+        obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+        obstacleManager.ReportObstacle(obstacle, "handled");
+        GetClosestSecuredLocation();
+        isHoldingObstacle = true;
+        endX = securedLocation.x;
+        endY = securedLocation.y;
+        queueBackTaskState = true;
+        SendRequest();
     }
 
     private IEnumerator DestroyUnattendedRoutine()
     {
         isDestroying = true;
 
+        icon.SetActive(true);
+
         yield return new WaitForSeconds(2f);
-        
+
+        icon.SetActive(false);
+
         foreach (Transform child in transform)
         {
             if (child.CompareTag("UnattendedObstacle"))
@@ -77,25 +121,10 @@ public class SecurityRobot : Robot
 
         Debug.Log($"[SecurityRobot {robotId}] Package destroyed at {securedLocation}.");
 
-        SetNextDestination();
-        isPerformingTask = false;
-        obstacleDetected = false;
+        isHoldingObstacle = false;
         isDestroying = false;
-    }
-
-    private void SetNextDestination()
-    {
-        float minDistance = float.MaxValue;
-        int closestIndex = 0;
-        for (int i = 0; i < destinations.Count; i++)
-        {
-            float d = Vector3.Distance(transform.position, destinations[i]);
-            if (d < minDistance)
-            {
-                minDistance = d;
-                closestIndex = i;
-            }
-        }
-        destinationIndex = closestIndex;
+        queueBackTaskState = false;
+        currentState = RobotState.Moving;
+        SetNextClosestDestination();
     }
 }

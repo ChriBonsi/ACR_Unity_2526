@@ -8,9 +8,9 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.RobotManager
 {
     [Serializable]
-    public class RobotManagerTrackerSubscriberMsg : Message
+    public class RobotManagerTrackerMsg : Message
     {
-        public const string k_RosMessageName = "robot_manager/RobotManagerTrackerSubscriber";
+        public const string k_RosMessageName = "robot_manager/RobotManagerTracker";
         public override string RosMessageName => k_RosMessageName;
 
         public int robot_id;
@@ -30,7 +30,7 @@ namespace RosMessageTypes.RobotManager
         public float obstacle_distance_threshold;
         public string robot_type;
 
-        public RobotManagerTrackerSubscriberMsg()
+        public RobotManagerTrackerMsg()
         {
             this.robot_id = 0;
             this.current_x = 0.0f;
@@ -50,7 +50,7 @@ namespace RosMessageTypes.RobotManager
             this.robot_type = "";
         }
 
-        public RobotManagerTrackerSubscriberMsg(int robot_id, float current_x, float current_y, float start_x, float start_y, float end_x, float end_y, float move_speed, bool loop, float[] destinations_x, float[] destinations_y, bool obstacle_detected, bool performing_task, float perception_radius, float obstacle_distance_threshold, string robot_type)
+        public RobotManagerTrackerMsg(int robot_id, float current_x, float current_y, float start_x, float start_y, float end_x, float end_y, float move_speed, bool loop, float[] destinations_x, float[] destinations_y, bool obstacle_detected, bool performing_task, float perception_radius, float obstacle_distance_threshold, string robot_type)
         {
             this.robot_id = robot_id;
             this.current_x = current_x;
@@ -70,9 +70,9 @@ namespace RosMessageTypes.RobotManager
             this.robot_type = robot_type;
         }
 
-        public static RobotManagerTrackerSubscriberMsg Deserialize(MessageDeserializer deserializer) => new RobotManagerTrackerSubscriberMsg(deserializer);
+        public static RobotManagerTrackerMsg Deserialize(MessageDeserializer deserializer) => new RobotManagerTrackerMsg(deserializer);
 
-        private RobotManagerTrackerSubscriberMsg(MessageDeserializer deserializer)
+        private RobotManagerTrackerMsg(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.robot_id);
             deserializer.Read(out this.current_x);
@@ -116,7 +116,7 @@ namespace RosMessageTypes.RobotManager
 
         public override string ToString()
         {
-            return "RobotManagerTrackerSubscriberMsg: " +
+            return "RobotManagerTrackerMsg: " +
             "\nrobot_id: " + robot_id.ToString() +
             "\ncurrent_x: " + current_x.ToString() +
             "\ncurrent_y: " + current_y.ToString() +

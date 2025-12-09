@@ -8,39 +8,51 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.ObstacleManager
 {
     [Serializable]
-    public class ObstacleManagerPublisherMsg : Message
+    public class ObstacleManagerReportMsg : Message
     {
-        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerPublisher";
+        public const string k_RosMessageName = "obstacle_manager/ObstacleManagerReport";
         public override string RosMessageName => k_RosMessageName;
 
         public float x;
         public float y;
         public string type;
+        public string status;
+        public float scale_x;
+        public float scale_y;
         public string id;
 
-        public ObstacleManagerPublisherMsg()
+        public ObstacleManagerReportMsg()
         {
             this.x = 0.0f;
             this.y = 0.0f;
             this.type = "";
+            this.status = "";
+            this.scale_x = 0.0f;
+            this.scale_y = 0.0f;
             this.id = "";
         }
 
-        public ObstacleManagerPublisherMsg(float x, float y, string type, string id)
+        public ObstacleManagerReportMsg(float x, float y, string type, string status, float scale_x, float scale_y, string id)
         {
             this.x = x;
             this.y = y;
             this.type = type;
+            this.status = status;
+            this.scale_x = scale_x;
+            this.scale_y = scale_y;
             this.id = id;
         }
 
-        public static ObstacleManagerPublisherMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerPublisherMsg(deserializer);
+        public static ObstacleManagerReportMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerReportMsg(deserializer);
 
-        private ObstacleManagerPublisherMsg(MessageDeserializer deserializer)
+        private ObstacleManagerReportMsg(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.x);
             deserializer.Read(out this.y);
             deserializer.Read(out this.type);
+            deserializer.Read(out this.status);
+            deserializer.Read(out this.scale_x);
+            deserializer.Read(out this.scale_y);
             deserializer.Read(out this.id);
         }
 
@@ -49,15 +61,21 @@ namespace RosMessageTypes.ObstacleManager
             serializer.Write(this.x);
             serializer.Write(this.y);
             serializer.Write(this.type);
+            serializer.Write(this.status);
+            serializer.Write(this.scale_x);
+            serializer.Write(this.scale_y);
             serializer.Write(this.id);
         }
 
         public override string ToString()
         {
-            return "ObstacleManagerPublisherMsg: " +
+            return "ObstacleManagerReportMsg: " +
             "\nx: " + x.ToString() +
             "\ny: " + y.ToString() +
             "\ntype: " + type.ToString() +
+            "\nstatus: " + status.ToString() +
+            "\nscale_x: " + scale_x.ToString() +
+            "\nscale_y: " + scale_y.ToString() +
             "\nid: " + id.ToString();
         }
 
