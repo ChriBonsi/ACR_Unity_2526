@@ -3,6 +3,9 @@ using System.Collections;
 
 public class CleanerRobot : Robot
 {
+    private GameObject cleaningTarget;
+    private bool isCleaning = false;
+    
     protected override int GetPriority()
     {
         return 1;
@@ -12,13 +15,10 @@ public class CleanerRobot : Robot
     {
         if (objectHit.CompareTag("DirtObstacle"))
         {
-            if (Vector3.Distance(transform.position, objectHit.transform.position) < 0.1f)
-            {
-                if (currentState != RobotState.PerformingTask)
-                {
-                    StartCoroutine(CleanDirtRoutine(objectHit));
-                }
-            }
+            currentState = RobotState.PerformingTask;
+            cleaningTarget = objectHit;
+            pathQueue.Clear();
+            pathQueue.Enqueue(objectHit.transform.position);
             return true;
         }
         return false;
@@ -26,6 +26,20 @@ public class CleanerRobot : Robot
 
     protected override void UpdateTask()
     {
+        if(currentState != RobotState.PerformingTask || cleaningTarget == null) return;
+
+        if (Vector3.Distance(transform.position, cleaningTarget.transform.position) < 0.1f)
+        {
+            if(!isCleaning)
+            {
+                isCleaning = true;
+                StartCoroutine(CleanDirtRoutine(cleaningTarget));
+            }
+        }
+        else
+        {
+            Move();
+        }
     }
 
     private IEnumerator CleanDirtRoutine(GameObject obstacle)
@@ -34,14 +48,17 @@ public class CleanerRobot : Robot
         currentState = RobotState.PerformingTask;
 
         icon.SetActive(true);
-
         yield return new WaitForSeconds(2f);
-
         icon.SetActive(false);
-
-        Destroy(obstacle);
+        
         obstacleManager.ReportObstacle(obstacle, "handled");
+        isCleaning = false;
+        cleaningTarget = null;
+        Destroy(obstacle);
+
+        yield return new WaitForSeconds(0.2f);
 
         currentState = RobotState.Moving;
+        SendRequest();
     }
 }

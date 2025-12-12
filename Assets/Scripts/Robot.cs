@@ -212,7 +212,8 @@ public class Robot : MonoBehaviour
             currentPosition,
             0.5f,
             direction.normalized,
-            Vector3.Distance(currentPosition, target)
+            2f
+            //Vector3.Distance(currentPosition, target)
         );
 
         if (hits.Length == 0) return;
@@ -235,7 +236,7 @@ public class Robot : MonoBehaviour
 
             if(hit.distance <= obstacleDistanceThreshold)
             {
-                HandleStaticObstacle(objectHit);
+                HandleStaticObstacle(objectHit, hit.distance);
                 return;
             }
         }
@@ -255,7 +256,7 @@ public class Robot : MonoBehaviour
         }
         else if (myPriority == otherPriority)
         {
-            if (robotId > otherRobot.robotId) yield = true;
+            if (robotId < otherRobot.robotId) yield = true;
         }
 
         if (yield)
@@ -266,9 +267,12 @@ public class Robot : MonoBehaviour
         }
     }
 
-    private void HandleStaticObstacle(GameObject objectHit)
+    private void HandleStaticObstacle(GameObject objectHit, float distance)
     {
         if(HandleSpecialObstacle(objectHit)) return;
+        Vector3 target = pathQueue.Peek();
+        float distanceToTarget = Vector3.Distance(transform.position, target);
+        if(distanceToTarget <= distance) return;
         obstacleManager.ReportObstacle(objectHit, "unhandled");
         SendRequest();
     }
