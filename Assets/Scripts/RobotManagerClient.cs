@@ -26,7 +26,7 @@ public class RobotManagerClient : MonoBehaviour
 
     private void SpawnRobots(RobotManagerRobotMsg msg)
     {
-        Debug.Log($"[RobotManagerClient] Spawning robot {msg.robot_id} of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
+        //Debug.Log($"[RobotManagerClient] Spawning robot {msg.robot_id} of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
         GameObject robotInstance = Instantiate(robotPrefab, robotParent.transform);
         Robot robot = msg.robot_type switch
         {

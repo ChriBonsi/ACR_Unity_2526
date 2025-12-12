@@ -32,7 +32,7 @@ public class ObstacleManager
         {
             if(obstacles.ContainsKey(obstacle.GetInstanceID()))
             {
-                Debug.Log($"[Robot {robotId}] Removing obstacle {obstacle.GetInstanceID()} from known obstacles.");
+                //Debug.Log($"[Robot {robotId}] Removing obstacle {obstacle.GetInstanceID()} from known obstacles.");
                 obstacles.Remove(obstacle.GetInstanceID());
             }
         }
@@ -40,7 +40,7 @@ public class ObstacleManager
         {
             if (!obstacles.ContainsKey(obstacle.GetInstanceID()))
             {
-                Debug.Log($"[Robot {robotId}] Adding obstacle {obstacle.GetInstanceID()} to known obstacles.");
+                //Debug.Log($"[Robot {robotId}] Adding obstacle {obstacle.GetInstanceID()} to known obstacles.");
                 obstacles.Add(obstacle.GetInstanceID(), obstacle);
             }
         }
@@ -48,7 +48,7 @@ public class ObstacleManager
 
     private void PublishObstacle(GameObject obstacle, string status)
     {
-        Debug.Log($"[Robot {robotId}] Publishing obstacle {obstacle.GetInstanceID()} to all robots.");
+        //Debug.Log($"[Robot {robotId}] Publishing obstacle {obstacle.GetInstanceID()} to all robots.");
         Transform transform = obstacle.transform;
         var msg = new ObstacleManagerReportMsg
         {
@@ -65,7 +65,7 @@ public class ObstacleManager
 
     private void SubscribeCallback(ObstacleManagerReportMsg msg)
     {
-        Debug.Log($"[Robot {robotId}] Received obstacle report for obstacle ID {msg.id} with status {msg.status}.");
+        //Debug.Log($"[Robot {robotId}] Received obstacle report for obstacle ID {msg.id} with status {msg.status}.");
         GameObject gameObject = GameObject.Find(msg.id);
         if (gameObject != null)
         {

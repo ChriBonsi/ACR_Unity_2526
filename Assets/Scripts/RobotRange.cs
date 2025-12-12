@@ -55,7 +55,7 @@ public class RobotRange : MonoBehaviour
 
             rangeRenderer = go.AddComponent<LineRenderer>();
             rangeRenderer.useWorldSpace = false;
-            rangeRenderer.loop = false;
+            rangeRenderer.loop = true;
             rangeRenderer.widthMultiplier = 0.03f;
             rangeRenderer.material = new Material(Shader.Find("Sprites/Default"));
             rangeRenderer.numCornerVertices = 2;
