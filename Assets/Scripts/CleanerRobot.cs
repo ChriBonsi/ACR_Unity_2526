@@ -8,7 +8,7 @@ public class CleanerRobot : Robot
     
     protected override int GetPriority()
     {
-        return 1;
+        return 2;
     }
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)

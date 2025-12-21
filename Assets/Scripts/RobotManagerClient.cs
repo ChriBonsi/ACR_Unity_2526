@@ -32,6 +32,7 @@ public class RobotManagerClient : MonoBehaviour
         {
             "cleaner" => robotInstance.AddComponent<CleanerRobot>(),
             "security" => robotInstance.AddComponent<SecurityRobot>(),
+            "baggage" => robotInstance.AddComponent<BaggageRobot>(),
             _ => robotInstance.AddComponent<Robot>(),
         };
         robotInstance.transform.position = new Vector3(msg.start_x, msg.start_y, 0);
@@ -50,6 +51,8 @@ public class RobotManagerClient : MonoBehaviour
         robot.obstacleDistanceThreshold = msg.obstacle_distance_threshold;
         robot.robotType = msg.robot_type;
         robotInstance.name = $"{msg.robot_type}_robot_{msg.robot_id}";
+        robot.currentState = msg.robot_type == "baggage" ? RobotState.PerformingTask : RobotState.Moving;
+        robot.queueBackTaskState = msg.robot_type == "baggage";
     }
 
     public static void SendTrackingData(RobotManagerTrackerMsg msg)

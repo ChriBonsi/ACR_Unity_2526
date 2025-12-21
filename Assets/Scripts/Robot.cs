@@ -28,11 +28,11 @@ public class Robot : MonoBehaviour
     private float startY;
     protected GameObject icon;
     private GameObject currentRobotObstacle = null;
-    protected bool queueBackTaskState = false;
+    public bool queueBackTaskState = false;
     private float trackerTimer = 0f;
     protected ObstacleManager obstacleManager;
     private bool chargeLock = false;
-    private readonly float chargeRate = 20f;
+    protected readonly float chargeRate = 20f;
 
     void Start()
     {
@@ -81,14 +81,18 @@ public class Robot : MonoBehaviour
         switch (currentState)
         {
             case RobotState.Moving:
-            //CheckSensors();
             Move();
+            if(robotType == "baggage"){
+                queueBackTaskState = false;
+                if(Vector3.Distance(transform.position, new Vector3(endX, endY, 0)) < 0.1f){
+                    currentState = RobotState.PerformingTask;
+                    pathQueue.Clear();
+                    break;
+                }
+            }
             if(CheckIfChargingStationReached()) break;
             CheckIfQueuedPointReached();
-            if(pathQueue.Count == 0)
-            {
-                CheckAndAskForNewPath();
-            }
+            if(pathQueue.Count == 0) CheckAndAskForNewPath();
             break;
             case RobotState.Yielding:
             CheckIfYieldIsDone();
@@ -142,12 +146,13 @@ public class Robot : MonoBehaviour
         if(battery >= 100f)
         {
             Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
+            SetNextClosestDestination();
             SendRequest();
             chargeLock = false;
         }
     }
 
-    private void CheckAndAskForNewPath()
+    protected void CheckAndAskForNewPath()
     {
         if (destinations.Count > 0 && !isPathRequestPending)
         {
@@ -279,8 +284,20 @@ public class Robot : MonoBehaviour
 
     private void CheckIfYieldIsDone()
     {
-        if (currentRobotObstacle == null || 
-        Vector3.Distance(transform.position, currentRobotObstacle.transform.position) > perceptionRadius + 0.5f)
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, perceptionRadius);
+        bool isClear = true;
+
+        foreach (var hit in hits)
+        {
+            if (hit.gameObject == gameObject) continue;
+            if (hit.CompareTag("Robot"))
+            {
+                isClear = false;
+                break;
+            }
+        }
+
+        if (isClear)
         {
             currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
             currentRobotObstacle = null;

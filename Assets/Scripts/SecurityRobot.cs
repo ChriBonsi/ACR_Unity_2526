@@ -15,7 +15,7 @@ public class SecurityRobot : Robot
 
     protected override int GetPriority()
     {
-        return 2;
+        return 3;
     }
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)
@@ -64,8 +64,6 @@ public class SecurityRobot : Robot
         else
         {
             Move();
-            if (CheckIfChargingStationReached()) return;
-            CheckIfQueuedPointReached();
         }
     }
 

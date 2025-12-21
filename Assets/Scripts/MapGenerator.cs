@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using RosMessageTypes.Std;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 [System.Serializable]
 public class Node
@@ -83,6 +84,17 @@ public class MapGenerator : MonoBehaviour
                 9 => Color.yellow,
                 _ => Color.pink,
             };
+            
+            switch (node.type)
+            {
+                case 0 or 1 or 22 or 33 or 44 or 55:
+                    tile.AddComponent<BoxCollider2D>();
+                    BoxCollider2D collider = tile.GetComponent<BoxCollider2D>();
+                    collider.isTrigger = true;
+                    tile.tag = "Invalid";
+                    break;
+            }
+
             if (tile.TryGetComponent<Renderer>(out var rend))
             {
                 rend.material.color = tileColor;
