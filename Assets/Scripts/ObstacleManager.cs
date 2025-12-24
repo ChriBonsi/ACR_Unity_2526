@@ -21,22 +21,22 @@ public class ObstacleManager
 
     public void ReportObstacle(GameObject obstacle, string status)
     {
-        if(obstacle == null || string.IsNullOrEmpty(status)) return;
+        if (obstacle == null || string.IsNullOrEmpty(status)) return;
         PublishObstacle(obstacle, status);
         UpdateObstacles(obstacle, status);
     }
 
     private void UpdateObstacles(GameObject obstacle, string status)
     {
-        if(status == "handled")
+        if (status == "handled")
         {
-            if(obstacles.ContainsKey(obstacle.GetInstanceID()))
+            if (obstacles.ContainsKey(obstacle.GetInstanceID()))
             {
                 //Debug.Log($"[Robot {robotId}] Removing obstacle {obstacle.GetInstanceID()} from known obstacles.");
                 obstacles.Remove(obstacle.GetInstanceID());
             }
         }
-        else if(status == "unhandled")
+        else if (status == "unhandled")
         {
             if (!obstacles.ContainsKey(obstacle.GetInstanceID()))
             {
@@ -68,7 +68,7 @@ public class ObstacleManager
     private void SubscribeCallback(ObstacleManagerReportMsg msg)
     {
         //Debug.Log($"[Robot {robotId}] Received obstacle report for obstacle ID {msg.id} with status {msg.status}.");
-        GameObject gameObject = GameObject.Find(msg.id);
+        GameObject gameObject = obstacleContainer.transform.Find(msg.id)?.gameObject;
         if (gameObject != null)
         {
             UpdateObstacles(gameObject, msg.status);
