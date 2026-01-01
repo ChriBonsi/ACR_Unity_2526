@@ -20,7 +20,7 @@ public class BaggageRobot : Robot
     {
         if(currentState != RobotState.PerformingTask) return;
 
-        UpdateBattery(chargeRate * Time.deltaTime);
+        battery.ChargeRobot();
 
         if(loading){
             if(capacity < maxCapacity)
@@ -28,7 +28,7 @@ public class BaggageRobot : Robot
                 capacity += Time.deltaTime * 5;
             }
             else{
-                Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
+                //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
                 loading = false;
                 queueBackTaskState = false;
                 if(pathQueue.Count == 0) CheckAndAskForNewPath();
@@ -41,7 +41,7 @@ public class BaggageRobot : Robot
                 capacity -= Time.deltaTime * 5;
             }
             else{
-                Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
+                //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
                 loading = true;
                 queueBackTaskState = false;
                 if(pathQueue.Count == 0) CheckAndAskForNewPath();
