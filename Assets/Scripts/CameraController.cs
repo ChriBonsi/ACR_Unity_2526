@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -75,9 +76,24 @@ public class CameraController : MonoBehaviour
             {
                 pos.y -= zoomSpeed * Time.unscaledDeltaTime * 0.1f;
             }
+
+            if (Keyboard.current.lKey.isPressed)
+            {
+                Time.timeScale = 10f;
+            }
+
+            if (Keyboard.current.spaceKey.isPressed)
+            {
+                Time.timeScale = 10f;
+            }
+
+            if (Keyboard.current.spaceKey.wasReleasedThisFrame)
+            {
+                Time.timeScale = isPaused ? 0f : 1f;
+            }
         }
 
-        if (Mouse.current != null)
+        /* if (Mouse.current != null)
         {
             float scroll = Mouse.current.scroll.ReadValue().y;
             pos.y -= scroll * zoomSpeed * Time.unscaledDeltaTime * 0.01f;
@@ -91,7 +107,7 @@ public class CameraController : MonoBehaviour
                 
                 transform.Rotate(Vector3.right, -mouseY, Space.Self);
             }
-        }
+        } */
         
         transform.position = pos;
     }
