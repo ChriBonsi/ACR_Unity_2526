@@ -59,6 +59,7 @@ public class Robot : MonoBehaviour
         ros.Subscribe<StringMsg>("robot_coordination", CoordinationCallback);
 
         obstacleManager = new(robotId);
+        battery = new(robotId);
 
         icon = transform.Find("TaskIcon").gameObject;
         icon.SetActive(false);
