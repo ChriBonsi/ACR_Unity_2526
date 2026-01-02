@@ -20,16 +20,16 @@ public class Robot : MonoBehaviour
 
     [Header("Robot settings")]
     public int robotId = 1;
-    public float moveSpeed = 3f;
+    public float moveSpeed = 2f;
     public float perceptionRadius = 0.5f;
     public float obstacleDistanceThreshold = 2f;
     public string robotType = "default";
     public List<Vector3> destinations = new();
     public bool loop = false;
     public RobotState currentState = RobotState.Moving;
-    public float endX = 3;
-    public float endY = 3;
-    public float endZ = 0;
+    public float endX;
+    public float endY;
+    public float endZ;
 
     protected ROSConnection ros;
     public Queue<Vector3> pathQueue = new();
@@ -49,7 +49,7 @@ public class Robot : MonoBehaviour
     private bool isMovingToYield = false;
     private bool isReturningFromYield = false;
     private bool isPausedForSafety = false;
-    private Dictionary<int, float> lastCommandTime = new();
+    private readonly Dictionary<int, float> lastCommandTime = new();
 
     void Start()
     {
@@ -75,7 +75,7 @@ public class Robot : MonoBehaviour
     {
         if (gameObject == null) return;
 
-        if(RobotState.Deadlock == currentState) return;
+        if (currentState == RobotState.Deadlock) return;
 
         float currentBattery = battery.GetBattery();
 
@@ -85,16 +85,14 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        if(currentBattery <= 10f && !battery.IsChargeLocked())
+        if (currentBattery <= 10f && !battery.IsChargeLocked())
         {
             Debug.LogWarning($"[Robot {robotId}] Battery low: {currentBattery}%, requesting recharge.");
             SendBatteryRechargeRequest();
             return;
         }
 
-        //SendTrackingData();
-
-        if(currentState == RobotState.Moving)
+        if (currentState == RobotState.Moving)
         {
             CheckSensors();
         }
@@ -102,43 +100,49 @@ public class Robot : MonoBehaviour
         switch (currentState)
         {
             case RobotState.Moving:
-            Move();
-            if(robotType == "baggage"){
-                queueBackTaskState = false;
-                if(Vector3.Distance(transform.position, new Vector3(endX, endY, endZ)) < 0.1f){
-                    currentState = RobotState.PerformingTask;
-                    pathQueue.Clear();
-                    break;
-                }
-            }
-            if(CheckIfChargingStationReached()) break;
-            CheckIfQueuedPointReached();
-            if(pathQueue.Count == 0) CheckAndAskForNewPath();
-            break;
+                Move();
+                if (CheckBaggageReachedDestination()) break;
+                if (CheckIfChargingStationReached()) break;
+                CheckIfQueuedPointReached();
+                if (pathQueue.Count == 0) CheckAndAskForNewPath();
+                break;
             case RobotState.Yielding:
-            YieldBehavior();
-            break;
+                YieldBehavior();
+                break;
             case RobotState.PerformingTask:
-            UpdateTask();
-            break;
+                UpdateTask();
+                break;
             case RobotState.WaitingForPath:
-            break;
+                break;
             case RobotState.Charging:
-            ChargeAndCheck();
-            break;
+                ChargeAndCheck();
+                break;
         }
+    }
+
+    private bool CheckBaggageReachedDestination()
+    {
+        if (robotType != "baggage") return false;
+
+        if (Vector3.Distance(transform.position, new Vector3(endX, endY, endZ)) < 0.1f)
+        {
+            currentState = RobotState.PerformingTask;
+            pathQueue.Clear();
+            return true;
+        }
+        return false;
     }
 
     private void ChargeAndCheck()
     {
         battery.ChargeRobot();
-            if(battery.GetBattery() >= 100f)
-            {
-                Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
-                SetNextClosestDestination();
-                SendRequest();
-SetRobotVisibility(true);
-                battery.SetChargeLock(false);
+        if (battery.GetBattery() >= 100f)
+        {
+            Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
+            SetNextClosestDestination();
+            SendRequest();
+            SetRobotVisibility(true);
+            battery.SetChargeLock(false);
         }
     }
 
@@ -211,10 +215,10 @@ SetRobotVisibility(true);
 
     protected bool CheckIfChargingStationReached()
     {
-        if(!battery.IsChargeLocked()) return false;
-        if(pathQueue.Count == 0) return false;
+        if (!battery.IsChargeLocked()) return false;
+        if (pathQueue.Count == 0) return false;
         Vector3 lastPoint = pathQueue.ToArray()[pathQueue.Count - 1];
-        if(Vector3.Distance(transform.position, lastPoint) < 0.1f)
+        if (Vector3.Distance(transform.position, lastPoint) < 0.1f)
         {
             currentState = RobotState.Charging;
             SetRobotVisibility(false);
@@ -237,72 +241,97 @@ SetRobotVisibility(true);
     protected void CheckSensors()
     {
         isPausedForSafety = false;
-        if(pathQueue.Count == 0) return;
+        if (pathQueue.Count == 0) return;
         Vector3 target = pathQueue.Peek();
         Vector3 currentPosition = transform.position;
         Vector3 direction = target - currentPosition;
-        if(direction == Vector3.zero) return;
-        
+        if (direction == Vector3.zero) return;
+
         Collider[] colliderHits = Physics.OverlapSphere(currentPosition, obstacleDistanceThreshold);
-        
+
+        Array.Sort(colliderHits, (x, y) =>
+            Vector3.Distance(currentPosition, x.transform.position)
+            .CompareTo(Vector3.Distance(currentPosition, y.transform.position))
+        );
+
         foreach (var collider in colliderHits)
         {
-            if(collider == null || !collider.isTrigger) continue;
+            if (collider == null || !collider.isTrigger) continue;
             GameObject objectHit = collider.gameObject;
             if (objectHit == null || objectHit == gameObject) continue;
+            float distance = Vector3.Distance(currentPosition, objectHit.transform.position);
 
             // Dynamic robot-robot
-            if(objectHit.CompareTag("Robot"))
+            if (objectHit.CompareTag("Robot"))
             {
                 Robot otherRobot = objectHit.GetComponent<Robot>();
-                float distance = Vector3.Distance(currentPosition, objectHit.transform.position);
                 HandleRobotInteraction(otherRobot, distance);
                 return;
             }
-        }
 
-        RaycastHit[] hits = Physics.SphereCastAll(
-            currentPosition,
-            0.5f,
-            direction.normalized,
-            obstacleDistanceThreshold
-        );
-
-        if (hits.Length == 0) return;
-
-        Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
-
-        foreach (var hit in hits)
-        {
-            if(hit.collider == null || !hit.collider.isTrigger) continue;
-            GameObject objectHit = hit.collider.gameObject;
-            if (objectHit == null || objectHit == gameObject) continue;
-            if(objectHit.CompareTag("Robot")) continue;
-
-            if(hit.distance <= obstacleDistanceThreshold)
+            // Static obstacles
+            // Should always be true (distance inside radius) unless distance threshold used in OverlapSphere is different
+            if (distance <= obstacleDistanceThreshold)
             {
-                HandleStaticObstacle(objectHit, hit.distance);
+                HandleStaticObstacle(objectHit, distance);
                 return;
             }
         }
     }
 
-    private void HandleRobotInteraction(Robot otherRobot, float distance)
+    private bool CheckPrecedence(Robot otherRobot)
     {
-        if(distance > obstacleDistanceThreshold) return;
-
         int myPriority = GetPriority();
         int otherPriority = otherRobot.GetPriority();
-        bool precedence = false;
 
-        if (myPriority > otherPriority) 
+        if (myPriority > otherPriority)
         {
-            precedence = true;
+            return true;
         }
         else if (myPriority == otherPriority)
         {
-            if (robotId > otherRobot.robotId) precedence = true;
+            if (robotId > otherRobot.robotId) return true;
         }
+
+        return false;
+    }
+
+    private void PauseForSafety(Robot otherRobot, float distance)
+    {
+        float myRadius = transform.lossyScale.x / 2f;
+        float otherRadius = otherRobot.transform.lossyScale.x / 2f;
+        float safeDistance = myRadius + otherRadius + 0.2f;
+        //Debug.Log($"[Robot {robotId}] Higher priority than Robot {otherRobot.robotId}. Maintaining safe distance {safeDistance}.");
+
+        if (distance < safeDistance)
+        {
+            isPausedForSafety = true;
+        }
+    }
+
+    private void SendYieldCommand(Robot otherRobot, Vector3 yieldPos)
+    {
+        RobotCoordination data = new()
+        {
+            target_robot_id = otherRobot.robotId,
+            command = "yield",
+            x = yieldPos.x,
+            y = yieldPos.y,
+            z = yieldPos.z
+        };
+
+        StringMsg msg = new(JsonUtility.ToJson(data));
+        Debug.Log($"[Robot {robotId}] Commanded Robot {otherRobot.robotId} to yield at {yieldPos}");
+        ros.Publish("robot_coordination", msg);
+
+    }
+
+    private void HandleRobotInteraction(Robot otherRobot, float distance)
+    {
+        // Should always be false (distance inside radius) unless distance threshold used in OverlapSphere is different
+        if (distance > obstacleDistanceThreshold) return;
+
+        bool precedence = CheckPrecedence(otherRobot);
 
         if (!precedence)
         {
@@ -312,37 +341,23 @@ SetRobotVisibility(true);
                 currentState = RobotState.Yielding;
                 isMovingToYield = false;
                 isReturningFromYield = false;
-                obstacleManager.ReportObstacle(gameObject, "unhandled");
+                //obstacleManager.ReportObstacle(gameObject, "unhandled");
             }
         }
         else
         {
-            float myRadius = transform.lossyScale.x / 2f;
-            float otherRadius = otherRobot.transform.lossyScale.x / 2f;
-            float safeDistance = myRadius + otherRadius + 0.5f;
+            PauseForSafety(otherRobot, distance);
 
-            if (distance < safeDistance)
-            {
-                isPausedForSafety = true;
-            }
-
-            if (!lastCommandTime.ContainsKey(otherRobot.robotId) || Time.time - lastCommandTime[otherRobot.robotId] > 1.0f)
+            if (!lastCommandTime.ContainsKey(otherRobot.robotId) || Time.time - lastCommandTime[otherRobot.robotId] > 3f)
             {
                 if (FindYieldPosition(otherRobot, out Vector3 yieldPos))
                 {
-                    RobotCoordination data = new()
-                    {
-                        target_robot_id = otherRobot.robotId,
-                        command = "yield",
-                        x = yieldPos.x,
-                        y = yieldPos.y,
-                        z = yieldPos.z
-                    };
-                    
-                    StringMsg msg = new(JsonUtility.ToJson(data));
-                    ros.Publish("robot_coordination", msg);
+                    SendYieldCommand(otherRobot, yieldPos);
                     lastCommandTime[otherRobot.robotId] = Time.time;
-                    Debug.Log($"[Robot {robotId}] Commanded Robot {otherRobot.robotId} to yield at {yieldPos}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[Robot {robotId}] Unable to find yield position for Robot {otherRobot.robotId}. Default: {yieldPos}");
                 }
             }
         }
@@ -350,12 +365,21 @@ SetRobotVisibility(true);
 
     private void HandleStaticObstacle(GameObject objectHit, float distance)
     {
-        if(HandleSpecialObstacle(objectHit)) return;
+        if (HandleSpecialObstacle(objectHit)) return;
         Vector3 target = pathQueue.Peek();
         float distanceToTarget = Vector3.Distance(transform.position, target);
-        if(distanceToTarget <= distance) return;
-        obstacleManager.ReportObstacle(objectHit, "unhandled");
-        SendRequest();
+        //Debug.Log($"[Robot {robotId}] Detected static obstacle: {objectHit.name} at distance {distance}. Distance to target: {distanceToTarget}");
+        //UnityEditor.EditorApplication.isPaused = true;
+
+        Vector3 direction = (target - transform.position).normalized;
+        if (Physics.SphereCast(transform.position, perceptionRadius, direction, out RaycastHit hit, distanceToTarget))
+        {
+            if (hit.collider.gameObject == objectHit)
+            {
+                obstacleManager.ReportObstacle(objectHit, "unhandled");
+                SendRequest();
+            }
+        }
     }
 
     private void YieldBehavior()
@@ -377,7 +401,7 @@ SetRobotVisibility(true);
             {
                 isReturningFromYield = false;
                 currentState = !queueBackTaskState ? RobotState.Moving : RobotState.PerformingTask;
-                obstacleManager.ReportObstacle(gameObject, "handled");
+                //obstacleManager.ReportObstacle(gameObject, "handled");
                 Debug.Log($"[Robot {robotId}] Yield complete. Resuming.");
             }
             return;
@@ -453,43 +477,51 @@ SetRobotVisibility(true);
     private void CoordinationCallback(StringMsg msg)
     {
         RobotCoordination data = JsonUtility.FromJson<RobotCoordination>(msg.data);
-        if (data.target_robot_id == robotId && data.command == "yield")
+        if (data.target_robot_id != robotId) return;
+        if (data.command == "yield")
         {
             Vector3 targetPos = new(data.x, data.y, data.z);
+            if (yieldTargetPosition == targetPos) return;
             Debug.Log($"[Robot {robotId}] Received yield command to {targetPos}");
-            
             currentState = RobotState.Yielding;
             yieldTargetPosition = targetPos;
             yieldReturnPosition = transform.position;
             isMovingToYield = true;
             isReturningFromYield = false;
-            obstacleManager.ReportObstacle(gameObject, "unhandled");
+            //obstacleManager.ReportObstacle(gameObject, "unhandled");
         }
     }
 
     private bool FindYieldPosition(Robot otherRobot, out Vector3 yieldPos)
     {
-        yieldPos = otherRobot.transform.position;
+        Vector3 otherRobotPos = otherRobot.transform.position;
+        yieldPos = otherRobotPos;
         Vector3 myPos = transform.position;
-        
-        float[] checkDistances = new float[] { 1.0f, 1.5f, 2.0f };
-        
+
+        float[] checkDistances = new float[] { 1f };
+        float angleCheck = 45f;
+        int checkDirections = Mathf.CeilToInt(360f / angleCheck);
+
         foreach (float dist in checkDistances)
         {
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < checkDirections; i++)
             {
-                float angle = i * 45f;
+                float angle = i * angleCheck;
                 Quaternion rotation = Quaternion.Euler(0, angle, 0);
                 Vector3 dir = rotation * Vector3.forward;
-                
-                Vector3 candidatePos = otherRobot.transform.position + dir * dist;
-                
-                if (IsPositionValid(candidatePos) && IsSafeFromPath(candidatePos, this))
+
+                Vector3 candidatePos = otherRobotPos + dir * dist;
+
+                if (IsPositionValid(candidatePos, otherRobot) && IsSafeFromPath(candidatePos, this))
                 {
-                     if (Vector3.Distance(candidatePos, myPos) < Vector3.Distance(otherRobot.transform.position, myPos))
+                    if (Vector3.Distance(candidatePos, myPos) < Vector3.Distance(otherRobotPos, myPos))
                         continue;
 
-                    yieldPos = candidatePos;
+                    Debug.Log($"[Robot {robotId}] Found yield position at {candidatePos} with distance {dist} and angle {angle}");
+                    //yieldPos = candidatePos;
+                    yieldPos = new(Mathf.Round(candidatePos.x * 100f) / 100f,
+                                         Mathf.Round(candidatePos.y * 100f) / 100f,
+                                         Mathf.Round(candidatePos.z * 100f) / 100f);
                     return true;
                 }
             }
@@ -500,33 +532,25 @@ SetRobotVisibility(true);
     private bool IsSafeFromPath(Vector3 target, Robot robotToAvoid)
     {
         if (robotToAvoid.pathQueue == null || robotToAvoid.pathQueue.Count == 0) return true;
-        
-        float safetyDistance = 1.0f; 
-        
+
         foreach (var point in robotToAvoid.pathQueue)
         {
-             if (Vector3.Distance(target, point) < safetyDistance) return false;
+            if (Vector3.Distance(target, point) < 1f) return false;
         }
         return true;
     }
 
-    private bool IsPositionValid(Vector3 pos)
+    private bool IsPositionValid(Vector3 pos, Robot otherRobot)
     {
-        Collider[] hits = Physics.OverlapSphere(pos, 1f); 
+        Collider[] hits = Physics.OverlapSphere(pos, 0.45f);
         foreach (var hit in hits)
         {
             if (hit.gameObject == gameObject) continue;
-            if (hit.CompareTag("Invalid")) return false; 
-            if (hit.CompareTag("Robot")) return false; 
-            if (hit.GetComponent<Robot>() != null) return false;
+            if (hit.CompareTag("Invalid")) return false;
+            if (hit.CompareTag("Robot")) return false;
+            //if (hit.GetComponent<Robot>() != null) return false;
         }
         return true;
-    }
-
-    protected void UpdateBattery(float amount)
-    {
-        //Debug.Log($"[Robot {robotId}] Battery changed by {amount}.");
-        battery = Mathf.Clamp(battery + amount, 0f, 100f);
     }
 
     protected virtual bool HandleSpecialObstacle(GameObject objectHit)
@@ -555,10 +579,16 @@ SetRobotVisibility(true);
             if (distance < minDistance)
             {
                 minDistance = distance;
-                idx = i;        
+                idx = i;
             }
         }
-        destinationIndex = (idx - 1) % destinations.Count;
+        if (idx != -1)
+        {
+            destinationIndex = idx % destinations.Count;
+            endX = destinations[destinationIndex].x;
+            endY = destinations[destinationIndex].y;
+            endZ = destinations[destinationIndex].z;
+        }
     }
 
     protected void SendRequest()
@@ -582,7 +612,7 @@ SetRobotVisibility(true);
 
         ros.Publish("path_planner/request", req);
         isPathRequestPending = true;
-        Debug.Log($"[Robot {robotId}] Sent path request: ({currentX},{currentY},{currentZ}), ({endX},{endY},{endZ})");
+        //Debug.Log($"[Robot {robotId}] Sent path request: ({currentX},{currentY},{currentZ}), ({endX},{endY},{endZ})");
     }
 
     private void SendBatteryRechargeRequest()
