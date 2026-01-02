@@ -33,6 +33,7 @@ public class CleanerRobot : Robot
         {
             if(!isCleaning)
             {
+                gameObject.GetComponent<BoxCollider>().enabled = false;
                 isCleaning = true;
                 StartCoroutine(CleanDirtRoutine(cleaningTarget));
             }
@@ -66,6 +67,7 @@ public class CleanerRobot : Robot
 
         yield return new WaitForSeconds(0.2f);
 
+        gameObject.GetComponent<BoxCollider>().enabled = true;
         currentState = RobotState.Moving;
         SendRequest();
     }

@@ -137,6 +137,7 @@ public class Robot : MonoBehaviour
                 Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
                 SetNextClosestDestination();
                 SendRequest();
+SetRobotVisibility(true);
                 battery.SetChargeLock(false);
         }
     }
@@ -216,6 +217,7 @@ public class Robot : MonoBehaviour
         if(Vector3.Distance(transform.position, lastPoint) < 0.1f)
         {
             currentState = RobotState.Charging;
+            SetRobotVisibility(false);
             Debug.Log($"[Robot {robotId}] Reached charging station. Starting to charge.");
             return true;
         }
@@ -534,6 +536,13 @@ public class Robot : MonoBehaviour
 
     protected virtual void UpdateTask()
     {
+    }
+
+    protected void SetRobotVisibility(bool visible)
+    {
+        foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = visible;
+        foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = visible;
+        foreach (var c in GetComponentsInChildren<Canvas>()) c.enabled = visible;
     }
 
     protected void SetNextClosestDestination()

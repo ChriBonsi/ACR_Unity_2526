@@ -2,9 +2,9 @@ using UnityEngine;
 
 public class BaggageRobot : Robot
 {
-    public float capacity = 0;
-    int maxCapacity = 20;
-    public bool loading = true;
+    private float capacity = 0;
+    private readonly int maxCapacity = 20;
+    private bool loading = true;
 
     protected override int GetPriority()
     {
@@ -26,11 +26,12 @@ public class BaggageRobot : Robot
             if(capacity < maxCapacity)
             {
                 capacity += Time.deltaTime * 5;
+                SetRobotVisibility(false);
             }
             else{
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
                 loading = false;
-                queueBackTaskState = false;
+                SetRobotVisibility(true);
                 if(pathQueue.Count == 0) CheckAndAskForNewPath();
                 else currentState = RobotState.Moving;
             }
@@ -39,11 +40,12 @@ public class BaggageRobot : Robot
             if(capacity > 0)
             {
                 capacity -= Time.deltaTime * 5;
+                SetRobotVisibility(false);
             }
             else{
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
                 loading = true;
-                queueBackTaskState = false;
+                SetRobotVisibility(true);
                 if(pathQueue.Count == 0) CheckAndAskForNewPath();
                 else currentState = RobotState.Moving;
             }
