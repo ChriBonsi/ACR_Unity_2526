@@ -16,6 +16,17 @@ public class BaggageRobot : Robot
         return false;
     }
 
+    protected override bool CheckDestinationReached()
+    {
+        if (Vector3.Distance(transform.position, new Vector3(endX, endY, endZ)) < 0.1f)
+        {
+            currentState = RobotState.PerformingTask;
+            pathQueue.Clear();
+            return true;
+        }
+        return false;
+    }
+
     protected override void UpdateTask()
     {
         if(currentState != RobotState.PerformingTask) return;
@@ -32,8 +43,7 @@ public class BaggageRobot : Robot
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
                 loading = false;
                 SetRobotVisibility(true);
-                if(pathQueue.Count == 0) CheckAndAskForNewPath();
-                else currentState = RobotState.Moving;
+                CheckAndAskForNewPath();
             }
         }
         else{
@@ -46,8 +56,7 @@ public class BaggageRobot : Robot
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
                 loading = true;
                 SetRobotVisibility(true);
-                if(pathQueue.Count == 0) CheckAndAskForNewPath();
-                else currentState = RobotState.Moving;
+                CheckAndAskForNewPath();
             }
         }
     }

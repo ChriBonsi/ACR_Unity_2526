@@ -36,23 +36,6 @@ public class SecurityRobot : Robot
     {
         if (currentState != RobotState.PerformingTask || unattendedTarget == null) return;
 
-        if (isHoldingObstacle)
-        {
-            CheckSensors();
-
-            if (Vector3.Distance(transform.position, securedLocation) < 0.1f)
-            {
-                if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
-            }
-            else
-            {
-                Move();
-                if (CheckIfChargingStationReached()) return;
-                CheckIfQueuedPointReached();
-            }
-            return;
-        }
-
         if (Vector3.Distance(transform.position, unattendedTarget.transform.position) < 0.1f)
         {
             if (!isHoldingObstacle)
@@ -105,15 +88,24 @@ public class SecurityRobot : Robot
 
         obstacleManager.ReportObstacle(obstacle, "handled");
         GetClosestSecuredLocation();
-        endX = securedLocation.x;
-        endY = securedLocation.y;
-        endZ = securedLocation.z;
-        queueBackTaskState = true;
+        SetGoal(securedLocation);
+        currentState = RobotState.Moving;
         SendRequest();
+    }
+
+    protected override bool CheckDestinationReached()
+    {
+        if (isHoldingObstacle && Vector3.Distance(transform.position, securedLocation) < 0.1f)
+        {
+            if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
+            return true;
+        }
+        return false;
     }
 
     private IEnumerator DestroyUnattendedRoutine()
     {
+        currentState = RobotState.PerformingTask;
         isDestroying = true;
 
         icon.SetActive(true);
@@ -125,7 +117,6 @@ public class SecurityRobot : Robot
 
         isHoldingObstacle = false;
         isDestroying = false;
-        queueBackTaskState = false;
         unattendedTarget = null;
         currentState = RobotState.Moving;
         SetNextClosestDestination();
