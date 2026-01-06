@@ -47,13 +47,14 @@ public class Robot : MonoBehaviour
     private float yieldTimer = 0f;
     private float isPausedTimer = 0f;
     private Vector3 yieldTargetPosition;
-    private Vector3 yieldReturnPosition;
+    //private Vector3 yieldReturnPosition;
     private bool isMovingToYield = false;
-    private bool isReturningFromYield = false;
+    //private bool isReturningFromYield = false;
     public bool isPausedForSafety = false;
     private readonly Dictionary<int, float> lastCommandTime = new();
     protected string lastNodeKey = "";
     private Vector3 lastPosition = Vector3.zero;
+    private float safeDistanceThreshold = 1f;
     private readonly RobotState[] priorityStates = new RobotState[]
     {
         RobotState.Deadlock,
@@ -207,6 +208,7 @@ public class Robot : MonoBehaviour
     {
         // Should always be false (distance inside radius) unless distance threshold used in OverlapSphere is different
         if (distance > obstacleDistanceThreshold) return;
+        if(!IsBlockingMyPath(otherRobot)) return;
 
         bool precedence = CheckPrecedence(otherRobot);
 
@@ -215,37 +217,40 @@ public class Robot : MonoBehaviour
             // If actively moving to a yield position, be less sensitive to blocking as it is trying to clear the way. However, strictly enforce physical safety.
             if (isMovingToYield)
             {
-                float myRadius = transform.lossyScale.x / 2f;
+                /* float myRadius = transform.lossyScale.x / 2f;
                 float otherRadius = otherRobot.transform.lossyScale.x / 2f;
                 float safeDistance = myRadius + otherRadius + 0.1f;
                 if (distance < safeDistance)
                 {
                     isPausedForSafety = true;
-                }
-                //PauseForSafety(otherRobot, distance);
+                } */
+                PauseForSafety(otherRobot, distance);
             }
             // Pause if the other robot blocks our path
-            else if (!isPausedForSafety && IsBlocking(otherRobot))
+            else if (!isPausedForSafety)
             {
                 //Debug.Log($"[Robot {robotId}] Lower priority than Robot {otherRobot.robotId}. Waiting for instructions.");
                 //currentState = RobotState.Yielding;
                 isPausedForSafety = true;
                 isMovingToYield = false;
-                isReturningFromYield = false;
+                //isReturningFromYield = false;
                 //obstacleManager.ReportObstacle(gameObject, "unhandled");
             }
         }
         else
         {
             PauseForSafety(otherRobot, distance);
-            bool isBlocking = IsBlocking(otherRobot);
             bool timeExpired = !lastCommandTime.ContainsKey(otherRobot.robotId) || Time.time - lastCommandTime[otherRobot.robotId] > 1f;
-            if (isBlocking && timeExpired)
+            if (timeExpired)
             {
                 if (FindYieldPosition(otherRobot, out Vector3 yieldPos))
                 {
                     SendYieldCommand(otherRobot, yieldPos);
                     lastCommandTime[otherRobot.robotId] = Time.time;
+                }
+                else
+                {
+                    Debug.Log($"[Robot {robotId}] No valid yield position found for Robot {otherRobot.robotId}. Maintaining position.");
                 }
             }
         }
@@ -281,12 +286,12 @@ public class Robot : MonoBehaviour
 
     private void PauseForSafety(Robot otherRobot, float distance)
     {
-        float myRadius = transform.lossyScale.x / 2f;
+        /* float myRadius = transform.lossyScale.x / 2f;
         float otherRadius = otherRobot.transform.lossyScale.x / 2f;
-        float safeDistance = myRadius + otherRadius + 0.2f;
+        float safeDistance = 1f; */
         //Debug.Log($"[Robot {robotId}] Higher priority than Robot {otherRobot.robotId}. Maintaining safe distance {safeDistance}.");
 
-        if (distance < safeDistance)
+        if (distance < safeDistanceThreshold)
         {
             isPausedForSafety = true;
         }
@@ -298,7 +303,7 @@ public class Robot : MonoBehaviour
         yieldPos = otherRobotPos;
         Vector3 myPos = transform.position;
 
-        float[] checkDistances = new float[] { 1f, 1.5f };
+        float[] checkDistances = new float[] { 1f };
         float angleCheck = 45f;
         int checkDirections = Mathf.CeilToInt(360f / angleCheck);
 
@@ -488,7 +493,7 @@ public class Robot : MonoBehaviour
         }
     }
 
-    private bool IsBlocking(Robot otherRobot)
+    private bool IsBlockingMyPath(Robot otherRobot)
     {
         Vector3 target = pathQueue.Peek();
         Vector3 direction = (target - transform.position).normalized;
@@ -505,33 +510,11 @@ public class Robot : MonoBehaviour
 
     private void YieldBehavior()
     {
-        /* if (isMovingToYield)
-        {
-            transform.position = Vector3.MoveTowards(transform.position, yieldTargetPosition, moveSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, yieldTargetPosition) < 0.02f)
-            {
-                isMovingToYield = false;
-            }
-            return;
-        } */
-
-        /* if (isReturningFromYield)
-        {
-            transform.position = Vector3.MoveTowards(transform.position, yieldReturnPosition, moveSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, yieldReturnPosition) < 0.02f)
-            {
-                isReturningFromYield = false;
-                currentState = RobotState.Moving;
-                //Debug.Log($"[Robot {robotId}] Yield complete. Resuming.");
-            }
-            return;
-        } */
-
         if (FindBestReturnPoint(out Vector3 returnPos))
         {
             if (IsSafeToReturn(returnPos))
             {
-                yieldReturnPosition = returnPos;
+                //yieldReturnPosition = returnPos;
                 UpdatePathQueue(returnPos);
                 currentState = RobotState.Moving;
                 //isReturningFromYield = true;
@@ -816,15 +799,27 @@ public class Robot : MonoBehaviour
             Vector3[] existingPath = pathQueue.ToArray();
             pathQueue.Clear();
             pathQueue.Enqueue(targetPos);
-            foreach (var point in existingPath)
+
+            if (!isMovingToYield)
             {
-                pathQueue.Enqueue(point);
+                pathQueue.Enqueue(transform.position);
+                foreach (var point in existingPath)
+                {
+                    pathQueue.Enqueue(point);
+                }
+            }
+            else
+            {
+                for (int i = 1; i < existingPath.Length; i++)
+                {
+                    pathQueue.Enqueue(existingPath[i]);
+                }
             }
 
             yieldTargetPosition = targetPos;
-            yieldReturnPosition = transform.position;
+            //yieldReturnPosition = transform.position;
             isMovingToYield = true;
-            isReturningFromYield = false;
+            //isReturningFromYield = false;
             isPausedForSafety = false;
             currentState = RobotState.Moving;
         }
