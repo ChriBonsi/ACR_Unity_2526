@@ -46,8 +46,8 @@ public class ObstacleManager
             {
                 //Debug.Log($"[Robot {robotId}] Removing obstacle {obstacle.GetInstanceID()} from known obstacles.");
                 obstacles.Remove(obstacle.GetInstanceID());
-                robot.OnObstacleHandled(obstacle.GetInstanceID());
             }
+            robot.OnObstacleHandled(obstacle.GetInstanceID());
         }
         else if (status == "unhandled")
         {
@@ -89,7 +89,7 @@ public class ObstacleManager
         }
         else
         {
-            if (obstacles.ContainsKey(int.TryParse(msg.id, out int id ) ? id : -1)) return;
+            if (obstacles.ContainsKey(int.TryParse(msg.id, out int id) ? id : -1)) return;
             {
                 obstacles.Remove(id);
                 robot.OnObstacleHandled(id);
