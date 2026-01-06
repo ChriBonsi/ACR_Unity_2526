@@ -18,6 +18,7 @@ public class BaggageRobot : Robot
 
     protected override bool CheckDestinationReached()
     {
+        if(base.CheckDestinationReached()) return true;
         if (Vector3.Distance(transform.position, new Vector3(endX, endY, endZ)) < 0.1f)
         {
             currentState = RobotState.PerformingTask;
