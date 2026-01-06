@@ -1,18 +1,24 @@
 using System.Collections.Generic;
+using System.Linq;
 using RosMessageTypes.ObstacleManager;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine;
 
 public class ObstacleManager
 {
+    private readonly string[] validTags = new string[]
+    {
+        "UnattendedObstacle",
+        "DirtObstacle",
+    };
     private readonly Dictionary<int, GameObject> obstacles;
     private readonly ROSConnection ros;
-    private readonly int robotId;
+    private readonly Robot robot;
     private readonly GameObject obstacleContainer;
 
-    public ObstacleManager(int robotId)
+    public ObstacleManager(Robot robot)
     {
-        this.robotId = robotId;
+        this.robot = robot;
         ros = ROSConnection.GetOrCreateInstance();
         ros.Subscribe<ObstacleManagerReportMsg>("obstacle_manager/report_obstacle", SubscribeCallback);
         obstacles = new();
@@ -21,9 +27,15 @@ public class ObstacleManager
 
     public void ReportObstacle(GameObject obstacle, string status)
     {
-        if (obstacle == null || string.IsNullOrEmpty(status)) return;
+        if (obstacle == null || string.IsNullOrEmpty(status) || !validTags.Contains(obstacle.tag)) return;
         PublishObstacle(obstacle, status);
         UpdateObstacles(obstacle, status);
+    }
+
+    public GameObject GetObstacle(int id)
+    {
+        GameObject obstacle = obstacles.GetValueOrDefault(id, null);
+        return obstacle;
     }
 
     private void UpdateObstacles(GameObject obstacle, string status)
@@ -34,6 +46,7 @@ public class ObstacleManager
             {
                 //Debug.Log($"[Robot {robotId}] Removing obstacle {obstacle.GetInstanceID()} from known obstacles.");
                 obstacles.Remove(obstacle.GetInstanceID());
+                robot.OnObstacleHandled(obstacle.GetInstanceID());
             }
         }
         else if (status == "unhandled")
@@ -42,13 +55,14 @@ public class ObstacleManager
             {
                 //Debug.Log($"[Robot {robotId}] Adding obstacle {obstacle.GetInstanceID()} to known obstacles.");
                 obstacles.Add(obstacle.GetInstanceID(), obstacle);
+                robot.OnObstacleUnhandled(obstacle);
             }
         }
     }
 
     private void PublishObstacle(GameObject obstacle, string status)
     {
-        //Debug.Log($"[Robot {robotId}] Publishing obstacle {obstacle.GetInstanceID()} at {obstacle.transform.position} to all robots.");
+        //Debug.Log($"[Robot {robot.robotId}] Publishing obstacle {obstacle.GetInstanceID()} at {obstacle.transform.position} to all robots.");
         Transform transform = obstacle.transform;
         var msg = new ObstacleManagerReportMsg
         {
@@ -72,6 +86,14 @@ public class ObstacleManager
         if (gameObject != null)
         {
             UpdateObstacles(gameObject, msg.status);
+        }
+        else
+        {
+            if (obstacles.ContainsKey(int.TryParse(msg.id, out int id ) ? id : -1)) return;
+            {
+                obstacles.Remove(id);
+                robot.OnObstacleHandled(id);
+            }
         }
     }
 }
