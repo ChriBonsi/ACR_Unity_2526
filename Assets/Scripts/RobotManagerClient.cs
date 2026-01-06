@@ -28,26 +28,24 @@ public class RobotManagerClient : MonoBehaviour
     {
         //Debug.Log($"[RobotManagerClient] Spawning robot {msg.robot_id} of type: {msg.robot_type} at ({msg.start_x}, {msg.start_y})");
         GameObject robotInstance = Instantiate(robotPrefab, robotParent.transform);
-        Robot robot = msg.robot_type switch
-        {
-            "cleaner" => robotInstance.AddComponent<CleanerRobot>(),
-            "security" => robotInstance.AddComponent<SecurityRobot>(),
-            "baggage" => robotInstance.AddComponent<BaggageRobot>(),
-            _ => robotInstance.AddComponent<Robot>(),
-        };
+        Robot robot;
 
         switch (msg.robot_type)
         {
             case "cleaner":
+                robot = robotInstance.AddComponent<CleanerRobot>();
                 robotInstance.GetComponent<Renderer>().material.color = Color.blue;
                 break;
             case "security":
+                robot = robotInstance.AddComponent<SecurityRobot>();
                 robotInstance.GetComponent<Renderer>().material.color = Color.red;
                 break;
             case "baggage":
+                robot = robotInstance.AddComponent<BaggageRobot>();
                 robotInstance.GetComponent<Renderer>().material.color = Color.green;
                 break;
             default:
+                robot = robotInstance.AddComponent<Robot>();
                 robotInstance.GetComponent<Renderer>().material.color = Color.gray;
                 break;
         }
@@ -70,7 +68,6 @@ public class RobotManagerClient : MonoBehaviour
         robot.robotType = msg.robot_type;
         robotInstance.name = $"{msg.robot_type}_robot_{msg.robot_id}";
         robot.currentState = RobotState.Moving;
-        robot.queueBackTaskState = false;
     }
 
     public static void SendTrackingData(RobotManagerTrackerMsg msg)
