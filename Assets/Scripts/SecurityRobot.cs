@@ -119,6 +119,7 @@ public class SecurityRobot : Robot
         isDestroying = false;
         unattendedTarget = null;
         currentState = RobotState.Moving;
-        SetClosestDestination();
+        Vector3 closestDestination = GetClosestDestination();
+        SetGoal(closestDestination);
     }
 }

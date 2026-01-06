@@ -147,7 +147,9 @@ public class Robot : MonoBehaviour
                 if (CheckDestinationReached()) break;
                 if (CheckIfChargingStationReached()) break;
                 CheckIfQueuedPointReached();
-                CheckAndAskForNewPath();
+                Vector3 nextDestination = GetNextDestination();
+                SetGoal(nextDestination);
+                SendPathRequest();
                 break;
             case RobotState.Yielding:
                 YieldBehavior();
@@ -407,7 +409,8 @@ public class Robot : MonoBehaviour
         if (battery.GetBattery() >= 100f)
         {
             Debug.Log($"[Robot {robotId}] Fully charged. Resuming tasks.");
-            SetClosestDestination();
+            Vector3 closestDestination = GetClosestDestination();
+            SetGoal(closestDestination);
             SetRobotVisibility(true);
             battery.SetChargeLock(false);
             SendPathRequest();
@@ -448,9 +451,10 @@ public class Robot : MonoBehaviour
         }
     }
 
-    protected void CheckAndAskForNewPath()
+    protected Vector3 GetNextDestination()
     {
-        if (pathQueue.Count > 0) return;
+        Vector3 nextDestination = Vector3.zero;
+        if (pathQueue.Count > 0) return nextDestination;
         if (destinations.Count > 0 /* && !isPathRequestPending */)
         {
             if (loop)
@@ -459,13 +463,12 @@ public class Robot : MonoBehaviour
             }
             else
             {
-                if (destinationIndex >= destinations.Count - 1) return;
+                if (destinationIndex >= destinations.Count - 1) return nextDestination;
                 destinationIndex++;
             }
-            Vector3 nextDestination = destinations[destinationIndex];
-            SetGoal(nextDestination);
-            SendPathRequest();
+            nextDestination = destinations[destinationIndex];
         }
+        return nextDestination;
     }
 
     private bool CheckIfChargingStationReached()
@@ -599,7 +602,7 @@ public class Robot : MonoBehaviour
         transform.position =
             Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
 
-        string currentNode = GetNode();
+        string currentNode = GetCurrentPositionNode();
         if (currentNode != lastNodeKey)
         {
             ObstacleGenerator.UpdateObstacleDirt(currentNode);
@@ -649,7 +652,7 @@ public class Robot : MonoBehaviour
         endZ = goalPos.z;
     }
 
-    protected string GetNode()
+    protected string GetCurrentPositionNode()
     {
         int x = (int)transform.position.x;
         int y = (int)transform.position.y;
@@ -672,8 +675,9 @@ public class Robot : MonoBehaviour
         foreach (var c in GetComponentsInChildren<Canvas>()) c.enabled = visible;
     }
 
-    protected void SetClosestDestination()
+    protected Vector3 GetClosestDestination()
     {
+        if (destinations.Count == 0) return Vector3.zero;
         int idx = -1;
         float minDistance = float.PositiveInfinity;
         for (int i = 0; i < destinations.Count; i++)
@@ -688,8 +692,9 @@ public class Robot : MonoBehaviour
         if (idx != -1)
         {
             destinationIndex = idx % destinations.Count;
-            SetGoal(destinations[destinationIndex]);
+            return destinations[destinationIndex];
         }
+        return Vector3.zero;
     }
 
     private void SendYieldCommand(Robot otherRobot, Vector3 yieldPos)
@@ -711,6 +716,13 @@ public class Robot : MonoBehaviour
     protected void SendPathRequest()
     {
         if (isPathRequestPending || battery.IsChargeLocked()) return;
+        if(endX == 0f && endY == 0f && endZ == 0f)
+        {
+            currentState = RobotState.Deadlock;
+            Debug.LogWarning($"[Robot {robotId}] No valid goal set. Cannot send path request.");
+            return;
+        }
+
         currentState = RobotState.WaitingForPath;
 
         float currentX = transform.position.x;

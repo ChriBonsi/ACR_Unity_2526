@@ -44,7 +44,9 @@ public class BaggageRobot : Robot
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
                 loading = false;
                 SetRobotVisibility(true);
-                CheckAndAskForNewPath();
+                Vector3 nextDestination = GetNextDestination();
+                SetGoal(nextDestination);
+                SendPathRequest();
             }
         }
         else{
@@ -57,7 +59,9 @@ public class BaggageRobot : Robot
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
                 loading = true;
                 SetRobotVisibility(true);
-                CheckAndAskForNewPath();
+                Vector3 nextDestination = GetNextDestination();
+                SetGoal(nextDestination);
+                SendPathRequest();
             }
         }
     }
