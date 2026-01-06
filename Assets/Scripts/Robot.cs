@@ -95,7 +95,7 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        if (currentState == RobotState.Deadlock)
+        if (currentState == RobotState.Deadlock || currentState == RobotState.WaitingForPath)
         {
             deadLockTimer += Time.deltaTime;
             if (deadLockTimer >= 5f)
@@ -116,7 +116,7 @@ public class Robot : MonoBehaviour
             //currentState = RobotState.Moving;
         }
 
-        if (currentState == RobotState.Moving && Vector3.Distance(transform.position, lastPosition) < 0.01f)
+        if (currentState == RobotState.Moving && isPausedForSafety)
         {
             isPausedTimer += Time.deltaTime;
             lastPosition = transform.position;
@@ -208,7 +208,7 @@ public class Robot : MonoBehaviour
     {
         // Should always be false (distance inside radius) unless distance threshold used in OverlapSphere is different
         if (distance > obstacleDistanceThreshold) return;
-        if(!IsBlockingMyPath(otherRobot)) return;
+        if (!IsBlockingMyPath(otherRobot)) return;
 
         bool precedence = CheckPrecedence(otherRobot);
 
@@ -657,9 +657,11 @@ public class Robot : MonoBehaviour
         return $"{x},{y - 1},{z}";
     }
 
-    protected bool BlockOnObstacle()
+    protected bool CannotHandleObstacle()
     {
-        if (battery.GetBattery() <= 0f || isPathRequestPending || currentState == RobotState.Charging || battery.IsChargeLocked()) return true;
+        if (battery.GetBattery() <= 0f || isPathRequestPending || currentState == RobotState.Charging ||
+            battery.IsChargeLocked() || currentState == RobotState.PerformingTask || currentState == RobotState.Yielding ||
+            currentState == RobotState.WaitingForPath) return true;
         return false;
     }
 

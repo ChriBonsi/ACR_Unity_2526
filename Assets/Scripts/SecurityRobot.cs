@@ -21,7 +21,7 @@ public class SecurityRobot : Robot
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
         //if(isHoldingObstacle || battery.GetBattery() <= 0f || currentState == RobotState.Charging || battery.IsChargeLocked()) return false;
-        if(isHoldingObstacle || BlockOnObstacle()) return false;
+        if(isHoldingObstacle || CannotHandleObstacle()) return false;
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
             currentState = RobotState.PerformingTask;
