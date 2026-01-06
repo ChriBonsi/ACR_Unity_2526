@@ -18,6 +18,7 @@ public class ROSGlobalPublisher : MonoBehaviour
         ros.RegisterPublisher<StringMsg>("airport_grid/request_airport_grid");
         ros.RegisterPublisher<StringMsg>("path_planner/reset_state");
         ros.RegisterPublisher<StringMsg>("robot_coordination");
+        ros.RegisterPublisher<StringMsg>("cleaner_robot/cleaning_coordination");
         Debug.Log("Global ROS publishers registered.");
 
         ros.Publish("path_planner/reset_state", new StringMsg() { data = "reset" });

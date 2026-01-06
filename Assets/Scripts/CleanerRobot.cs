@@ -1,10 +1,28 @@
 using UnityEngine;
 using System.Collections;
+using RosMessageTypes.Std;
+using System;
+using System.Collections.Generic;
 
 public class CleanerRobot : Robot
 {
+    [Serializable]
+    private class CleaningBid
+    {
+        public int robotId;
+        public int objectId;
+        public float distance;
+    }
+
     private GameObject cleaningTarget;
     private bool isCleaning = false;
+    private readonly Dictionary<int, CleaningBid> cleaningBids = new();
+    
+    new void Start()
+    {
+        base.Start();
+        ros.Subscribe<StringMsg>("cleaner_robot/cleaning_coordination", CleaningBidCoordinationCallback);
+    }
     
     protected override int GetPriority()
     {
@@ -69,6 +87,12 @@ public class CleanerRobot : Robot
 
         gameObject.GetComponent<BoxCollider>().enabled = true;
         currentState = RobotState.Moving;
-        SendRequest();
+        SendPathRequest();
+    }
+
+    private void CleaningBidCoordinationCallback(StringMsg msg)
+    {
+        CleaningBid data = JsonUtility.FromJson<CleaningBid>(msg.data);
+        if (data == null) return;
     }
 }
