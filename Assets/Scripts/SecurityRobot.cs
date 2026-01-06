@@ -20,7 +20,8 @@ public class SecurityRobot : Robot
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
-        if (isHoldingObstacle) return false;
+        //if(isHoldingObstacle || battery.GetBattery() <= 0f || currentState == RobotState.Charging || battery.IsChargeLocked()) return false;
+        if(isHoldingObstacle || BlockOnObstacle()) return false;
         if (objectHit.CompareTag("UnattendedObstacle"))
         {
             currentState = RobotState.PerformingTask;
@@ -68,12 +69,12 @@ public class SecurityRobot : Robot
         }
 
         securedLocation = closest;
+        SetGoal(securedLocation);
     }
 
     private IEnumerator PickupRoutine(GameObject obstacle)
     {
         currentState = RobotState.PerformingTask;
-        pathQueue.Clear();
         Debug.Log($"[SecurityRobot {robotId}] Clearing unattended obstacle {obstacle.GetInstanceID()}...");
 
         icon.SetActive(true);
@@ -83,18 +84,17 @@ public class SecurityRobot : Robot
         obstacle.GetComponent<Collider>().enabled = false;
 
         obstacle.transform.SetParent(transform);
-        obstacle.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
+        obstacle.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
         obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
         obstacleManager.ReportObstacle(obstacle, "handled");
         GetClosestSecuredLocation();
-        SetGoal(securedLocation);
-        currentState = RobotState.Moving;
-        SendRequest();
+        SendPathRequest();
     }
 
     protected override bool CheckDestinationReached()
     {
+        if(base.CheckDestinationReached()) return true;
         if (isHoldingObstacle && Vector3.Distance(transform.position, securedLocation) < 0.1f)
         {
             if (!isDestroying) StartCoroutine(DestroyUnattendedRoutine());
@@ -119,6 +119,6 @@ public class SecurityRobot : Robot
         isDestroying = false;
         unattendedTarget = null;
         currentState = RobotState.Moving;
-        SetNextClosestDestination();
+        SetClosestDestination();
     }
 }
