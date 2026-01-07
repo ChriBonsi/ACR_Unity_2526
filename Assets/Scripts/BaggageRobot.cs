@@ -18,7 +18,7 @@ public class BaggageRobot : Robot
 
     protected override bool CheckDestinationReached()
     {
-        if(base.CheckDestinationReached()) return true;
+        if (base.CheckDestinationReached()) return true;
         if (Vector3.Distance(transform.position, new Vector3(endX, endY, endZ)) < 0.1f)
         {
             currentState = RobotState.PerformingTask;
@@ -30,39 +30,47 @@ public class BaggageRobot : Robot
 
     protected override void UpdateTask()
     {
-        if(currentState != RobotState.PerformingTask) return;
+        if (currentState != RobotState.PerformingTask) return;
 
         battery.ChargeRobot();
 
-        if(loading){
-            if(capacity < maxCapacity)
+        if (loading)
+        {
+            if (capacity < maxCapacity)
             {
                 capacity += Time.deltaTime * 5;
                 SetRobotVisibility(false);
             }
-            else{
+            else
+            {
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
-                loading = false;
-                SetRobotVisibility(true);
-                Vector3 nextDestination = GetNextDestination();
-                SetGoal(nextDestination);
-                SendPathRequest();
+                TriggerBackAndForth();
             }
         }
-        else{
-            if(capacity > 0)
+        else
+        {
+            if (capacity > 0)
             {
                 capacity -= Time.deltaTime * 5;
                 SetRobotVisibility(false);
             }
-            else{
+            else
+            {
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
-                loading = true;
-                SetRobotVisibility(true);
-                Vector3 nextDestination = GetNextDestination();
-                SetGoal(nextDestination);
-                SendPathRequest();
+                TriggerBackAndForth();
             }
+        }
+    }
+
+    private void TriggerBackAndForth()
+    {
+        loading = !loading;
+        SetRobotVisibility(true);
+        Vector3 nextDestination = GetNextDestination();
+        if (nextDestination != Vector3.zero)
+        {
+            SetGoal(nextDestination);
+            SendPathRequest();
         }
     }
 }
