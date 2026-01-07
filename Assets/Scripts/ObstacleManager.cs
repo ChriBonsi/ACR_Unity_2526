@@ -66,6 +66,7 @@ public class ObstacleManager
         Transform transform = obstacle.transform;
         var msg = new ObstacleManagerReportMsg
         {
+            robot_id = robot.robotId,
             id = obstacle.GetInstanceID().ToString(),
             x = transform.position.x,
             y = transform.position.y,
@@ -82,6 +83,7 @@ public class ObstacleManager
     private void SubscribeCallback(ObstacleManagerReportMsg msg)
     {
         //Debug.Log($"[Robot {robotId}] Received obstacle report for obstacle ID {msg.id} with status {msg.status}.");
+        if (msg.robot_id == robot.robotId) return;
         GameObject gameObject = obstacleContainer.transform.Find(msg.id)?.gameObject;
         if (gameObject != null)
         {

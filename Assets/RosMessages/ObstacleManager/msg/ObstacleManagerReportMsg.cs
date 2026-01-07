@@ -22,6 +22,7 @@ namespace RosMessageTypes.ObstacleManager
         public float scale_y;
         public float scale_z;
         public string id;
+        public int robot_id;
 
         public ObstacleManagerReportMsg()
         {
@@ -34,9 +35,10 @@ namespace RosMessageTypes.ObstacleManager
             this.scale_y = 0.0f;
             this.scale_z = 0.0f;
             this.id = "";
+            this.robot_id = 0;
         }
 
-        public ObstacleManagerReportMsg(float x, float y, float z, string type, string status, float scale_x, float scale_y, float scale_z, string id)
+        public ObstacleManagerReportMsg(float x, float y, float z, string type, string status, float scale_x, float scale_y, float scale_z, string id, int robot_id)
         {
             this.x = x;
             this.y = y;
@@ -47,6 +49,7 @@ namespace RosMessageTypes.ObstacleManager
             this.scale_y = scale_y;
             this.scale_z = scale_z;
             this.id = id;
+            this.robot_id = robot_id;
         }
 
         public static ObstacleManagerReportMsg Deserialize(MessageDeserializer deserializer) => new ObstacleManagerReportMsg(deserializer);
@@ -62,6 +65,7 @@ namespace RosMessageTypes.ObstacleManager
             deserializer.Read(out this.scale_y);
             deserializer.Read(out this.scale_z);
             deserializer.Read(out this.id);
+            deserializer.Read(out this.robot_id);
         }
 
         public override void SerializeTo(MessageSerializer serializer)
@@ -75,6 +79,7 @@ namespace RosMessageTypes.ObstacleManager
             serializer.Write(this.scale_y);
             serializer.Write(this.scale_z);
             serializer.Write(this.id);
+            serializer.Write(this.robot_id);
         }
 
         public override string ToString()
@@ -88,7 +93,8 @@ namespace RosMessageTypes.ObstacleManager
             "\nscale_x: " + scale_x.ToString() +
             "\nscale_y: " + scale_y.ToString() +
             "\nscale_z: " + scale_z.ToString() +
-            "\nid: " + id.ToString();
+            "\nid: " + id.ToString() +
+            "\nrobot_id: " + robot_id.ToString();
         }
 
 #if UNITY_EDITOR
