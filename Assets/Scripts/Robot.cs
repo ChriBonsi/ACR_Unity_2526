@@ -95,7 +95,7 @@ public class Robot : MonoBehaviour
             return;
         }
 
-        if (currentState == RobotState.Deadlock || currentState == RobotState.WaitingForPath)
+        /* if (currentState == RobotState.Deadlock || currentState == RobotState.WaitingForPath)
         {
             deadLockTimer += Time.deltaTime;
             if (deadLockTimer >= 5f)
@@ -126,7 +126,7 @@ public class Robot : MonoBehaviour
                 isPausedTimer = 0f;
                 //SendRequest();
             }
-        }
+        } */
 
         if (currentBattery <= 10f && !battery.IsChargeLocked())
         {
@@ -148,8 +148,11 @@ public class Robot : MonoBehaviour
                 if (CheckIfChargingStationReached()) break;
                 CheckIfQueuedPointReached();
                 Vector3 nextDestination = GetNextDestination();
-                SetGoal(nextDestination);
-                SendPathRequest();
+                if (nextDestination != Vector3.zero)
+                {
+                    SetGoal(nextDestination);
+                    SendPathRequest();
+                }
                 break;
             case RobotState.Yielding:
                 YieldBehavior();

@@ -40,6 +40,8 @@ public class CleanerRobot : Robot
         {
             MyList.Add(new KeyValuePair { key = kvp.Key, val = kvp.Value });
         }
+
+        if(currentState == RobotState.Moving) CheckTasksToDo();
     }
 
     protected override int GetPriority()
@@ -67,26 +69,10 @@ public class CleanerRobot : Robot
 
     protected override bool HandleSpecialObstacle(GameObject objectHit)
     {
-        //if(battery.GetBattery() <= 0f || currentState == RobotState.Charging || battery.IsChargeLocked()) return false;
         if (CannotHandleObstacle()) return false;
         if (objectHit.CompareTag("DirtObstacle"))
         {
-            int objectId = objectHit.GetInstanceID();
-            CleaningBid myBid = new()
-            {
-                robotId = robotId,
-                objectId = objectId,
-                distance = 0f
-            };
-
-            if (bestBids.TryGetValue(objectId, out CleaningBid currentBest))
-            {
-                if (!IsBidBetter(myBid, currentBest)) return false;
-            }
-
-            bestBids[objectId] = myBid;
-            PublishBid(myBid);
-
+            ProposeBid(objectHit);
             currentState = RobotState.PerformingTask;
             cleaningTarget = objectHit;
             pathQueue.Clear();
@@ -128,18 +114,7 @@ public class CleanerRobot : Robot
         {
             bestBids.Remove(obstacleId);
         }
-        if (CannotHandleObstacle()) return;
-        /* if (cleaningTarget != null && cleaningTarget.GetInstanceID() == obstacleId)
-        {
-            if (!isCleaning)
-            {
-                cleaningTarget = null;
-                CheckTasksToDo();
-                currentState = RobotState.Moving;
-                SendPathRequest();
-            }
-        } */
-        if (!isCleaning) IfIWasDoingIt(obstacleId);
+        IfIWasHandlingIt(obstacleId);
     }
 
     private bool CheckIfTouchingTarget(GameObject target)
@@ -159,30 +134,22 @@ public class CleanerRobot : Robot
         yield return new WaitForSeconds(2f);
         icon.SetActive(false);
 
-        obstacleManager.ReportObstacle(obstacle, "handled");
         isCleaning = false;
         cleaningTarget = null;
+        obstacleManager.ReportObstacle(obstacle, "handled");
 
         yield return new WaitForSeconds(0.2f);
 
         Destroy(obstacle);
         ObstacleGenerator.CleanedDirt(GetCurrentPositionNode());
         gameObject.GetComponent<BoxCollider>().enabled = true;
-
         currentState = RobotState.Moving;
-
-        if (!CannotHandleObstacle()) { CheckTasksToDo(); }
-        else
-        {
-            Vector3 closestDestination = GetClosestDestination();
-            SetGoal(closestDestination);
-        }
         SendPathRequest();
     }
 
     private void CheckTasksToDo()
     {
-        if (bestBids.Count == 0) return;
+        if (bestBids.Count == 0 || CannotHandleObstacle()) return;
 
         CleaningBid bestTask = null;
         float closestDistance = float.MaxValue;
@@ -205,29 +172,29 @@ public class CleanerRobot : Robot
             if (obstacle != null)
             {
                 Debug.Log($"[CleanerRobot {robotId}] Executing winning bid for obstacle {bestTask.objectId}.");
+                cleaningTarget = obstacle;
                 pathQueue.Clear();
                 Vector3 goal = obstacle.transform.position;
                 SetGoal(goal);
+                SendPathRequest();
             }
             else
             {
                 bestBids.Remove(bestTask.objectId);
             }
         }
-        else
-        {
-            Vector3 closestDestination = GetClosestDestination();
-            SetGoal(closestDestination);
-        }
     }
 
-    private void IfIWasDoingIt(int obstacleId)
+    private void IfIWasHandlingIt(int obstacleId)
     {
         if (cleaningTarget != null && cleaningTarget.GetInstanceID() == obstacleId)
         {
+            icon.SetActive(false);
             cleaningTarget = null;
             isCleaning = false;
-            CheckTasksToDo();
+            gameObject.GetComponent<BoxCollider>().enabled = true;
+            Vector3 closestDestination = GetClosestDestination();
+            SetGoal(closestDestination);
             currentState = RobotState.Moving;
             SendPathRequest();
         }
@@ -235,6 +202,7 @@ public class CleanerRobot : Robot
 
     private void ProposeBid(GameObject obstacle)
     {
+        if(obstacle == null) return;
         int objectId = obstacle.GetInstanceID();
         float myDistance = Vector3.Distance(transform.position, obstacle.transform.position);
 
@@ -262,9 +230,6 @@ public class CleanerRobot : Robot
         {
             bestBids[objectId] = myBid;
             PublishBid(myBid);
-            CheckTasksToDo();
-            currentState = RobotState.Moving;
-            SendPathRequest();
         }
     }
 
@@ -306,16 +271,7 @@ public class CleanerRobot : Robot
                 if (currentBest.robotId == robotId)
                 {
                     Debug.Log($"[CleanerRobot {robotId}] Outbid by Robot {incomingBid.robotId} for obstacle {objectId}.");
-                    /* if (cleaningTarget != null && cleaningTarget.GetInstanceID() == objectId)
-                    {
-                        cleaningTarget = null;
-                        isCleaning = false;
-                        CheckTasksToDo();
-                        currentState = RobotState.Moving;
-                        SendPathRequest();
-                    } */
-                    if (CannotHandleObstacle()) return;
-                    IfIWasDoingIt(objectId);
+                    IfIWasHandlingIt(objectId);
                 }
             }
             else if (currentBest.robotId == robotId)
@@ -326,6 +282,7 @@ public class CleanerRobot : Robot
         else
         {
             bestBids[objectId] = incomingBid;
+            ProposeBid(obstacleManager.GetObstacle(objectId));
         }
     }
 }
