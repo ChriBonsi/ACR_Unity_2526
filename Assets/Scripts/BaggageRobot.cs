@@ -43,6 +43,7 @@ public class BaggageRobot : Robot
             }
             else
             {
+                icon.SetActive(true);
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
                 TriggerBackAndForth();
             }
@@ -56,6 +57,7 @@ public class BaggageRobot : Robot
             }
             else
             {
+                icon.SetActive(false);
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
                 TriggerBackAndForth();
             }

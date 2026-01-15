@@ -8,6 +8,7 @@ public class ObstacleManager
 {
     private readonly string[] validTags = new string[]
     {
+        "Robot",
         "UnattendedObstacle",
         "DirtObstacle",
     };
@@ -27,7 +28,7 @@ public class ObstacleManager
 
     public void ReportObstacle(GameObject obstacle, string status)
     {
-        if (obstacle == null || string.IsNullOrEmpty(status) || !validTags.Contains(obstacle.tag)) return;
+        if (obstacle == null || string.IsNullOrEmpty(status) || !validTags.Contains(obstacle.tag) || obstacles.ContainsKey(obstacle.GetInstanceID())) return;
         PublishObstacle(obstacle, status);
         UpdateObstacles(obstacle, status);
     }

@@ -76,21 +76,6 @@ public class CameraController : MonoBehaviour
             {
                 pos.y -= zoomSpeed * Time.unscaledDeltaTime * 0.1f;
             }
-
-            if (Keyboard.current.lKey.isPressed)
-            {
-                Time.timeScale = 10f;
-            }
-
-            if (Keyboard.current.spaceKey.isPressed)
-            {
-                Time.timeScale = 10f;
-            }
-
-            if (Keyboard.current.spaceKey.wasReleasedThisFrame)
-            {
-                Time.timeScale = isPaused ? 0f : 1f;
-            }
         }
 
         /* if (Mouse.current != null)

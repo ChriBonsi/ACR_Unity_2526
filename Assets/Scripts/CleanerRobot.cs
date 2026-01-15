@@ -7,24 +7,16 @@ using System;
 public class CleanerRobot : Robot
 {
     [Serializable]
-    public class CleaningBid
+    private class CleaningBid
     {
         public int robotId;
         public int objectId;
         public float distance;
     }
 
-    [Serializable]
-    public class KeyValuePair
-    {
-        public int key;
-        public CleaningBid val;
-    }
-
     private GameObject cleaningTarget;
     private bool isCleaning = false;
     private readonly Dictionary<int, CleaningBid> bestBids = new();
-    public List<KeyValuePair> MyList = new();
 
     new void Start()
     {
@@ -35,12 +27,6 @@ public class CleanerRobot : Robot
     new void Update()
     {
         base.Update();
-        MyList.Clear();
-        foreach (var kvp in bestBids)
-        {
-            MyList.Add(new KeyValuePair { key = kvp.Key, val = kvp.Value });
-        }
-
         if(currentState == RobotState.Moving) CheckTasksToDo();
     }
 
@@ -75,6 +61,7 @@ public class CleanerRobot : Robot
             ProposeBid(objectHit);
             currentState = RobotState.PerformingTask;
             cleaningTarget = objectHit;
+            obstacleManager.ReportObstacle(gameObject, "unhandled");
             pathQueue.Clear();
             pathQueue.Enqueue(objectHit.transform.position);
             return true;
@@ -86,11 +73,11 @@ public class CleanerRobot : Robot
     {
         if (currentState != RobotState.PerformingTask || cleaningTarget == null) return;
 
-        if (CheckIfTouchingTarget(cleaningTarget))
+        if (Vector3.Distance(transform.position, cleaningTarget.transform.position) < 0.1f)
         {
             if (!isCleaning)
             {
-                gameObject.GetComponent<BoxCollider>().enabled = false;
+                //gameObject.GetComponent<BoxCollider>().enabled = false;
                 isCleaning = true;
                 StartCoroutine(CleanDirtRoutine(cleaningTarget));
             }
@@ -137,12 +124,13 @@ public class CleanerRobot : Robot
         isCleaning = false;
         cleaningTarget = null;
         obstacleManager.ReportObstacle(obstacle, "handled");
+        obstacleManager.ReportObstacle(gameObject, "handled");
 
         yield return new WaitForSeconds(0.2f);
-
+        
         Destroy(obstacle);
         ObstacleGenerator.CleanedDirt(GetCurrentPositionNode());
-        gameObject.GetComponent<BoxCollider>().enabled = true;
+        //gameObject.GetComponent<BoxCollider>().enabled = true;
         currentState = RobotState.Moving;
         SendPathRequest();
     }
@@ -184,7 +172,7 @@ public class CleanerRobot : Robot
             }
         }
     }
-
+    
     private void IfIWasHandlingIt(int obstacleId)
     {
         if (cleaningTarget != null && cleaningTarget.GetInstanceID() == obstacleId)
@@ -192,7 +180,8 @@ public class CleanerRobot : Robot
             icon.SetActive(false);
             cleaningTarget = null;
             isCleaning = false;
-            gameObject.GetComponent<BoxCollider>().enabled = true;
+            obstacleManager.ReportObstacle(gameObject, "handled");
+            //gameObject.GetComponent<BoxCollider>().enabled = true;
             Vector3 closestDestination = GetClosestDestination();
             SetGoal(closestDestination);
             currentState = RobotState.Moving;

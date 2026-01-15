@@ -82,7 +82,7 @@ public class MapGenerator : MonoBehaviour
                 44 => Color.gray,
                 5 => Color.darkGray,
                 55 => Color.darkGray,
-                6 => Color.green,
+                6 => Color.lightGreen,
                 7 => Color.green,
                 9 => Color.yellow,
                 _ => Color.pink,
