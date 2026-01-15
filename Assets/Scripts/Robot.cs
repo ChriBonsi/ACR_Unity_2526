@@ -67,7 +67,7 @@ public class Robot : MonoBehaviour
         ros = ROSConnection.GetOrCreateInstance();
 
         ros.Subscribe<PathPlannerResponseMsg>("path_planner/response", PathResultCallback);
-        ros.Subscribe<StringMsg>("robot_coordination", RobotCoordinationCallback);
+        ros.Subscribe<StringMsg>("robot/robot_coordination", RobotCoordinationCallback);
 
         obstacleManager = new(this);
         battery = new(robotId);
@@ -215,6 +215,13 @@ public class Robot : MonoBehaviour
         if (distance > obstacleDistanceThreshold) return;
         if (!IsBlockingMyPath(otherRobot)) return;
 
+        if(otherRobot.currentState == RobotState.Charging || otherRobot.currentState == RobotState.PerformingTask) 
+        {
+            SendPathRequest();
+            //PauseForSafety(otherRobot, distance);
+            return;
+        }
+
         bool precedence = CheckPrecedence(otherRobot);
 
         if (!precedence)
@@ -222,24 +229,13 @@ public class Robot : MonoBehaviour
             // If actively moving to a yield position, be less sensitive to blocking as it is trying to clear the way. However, strictly enforce physical safety.
             if (isMovingToYield)
             {
-                /* float myRadius = transform.lossyScale.x / 2f;
-                float otherRadius = otherRobot.transform.lossyScale.x / 2f;
-                float safeDistance = myRadius + otherRadius + 0.1f;
-                if (distance < safeDistance)
-                {
-                    isPausedForSafety = true;
-                } */
                 PauseForSafety(otherRobot, distance);
             }
             // Pause if the other robot blocks our path
             else if (!isPausedForSafety)
             {
-                //Debug.Log($"[Robot {robotId}] Lower priority than Robot {otherRobot.robotId}. Waiting for instructions.");
-                //currentState = RobotState.Yielding;
                 isPausedForSafety = true;
                 isMovingToYield = false;
-                //isReturningFromYield = false;
-                //obstacleManager.ReportObstacle(gameObject, "unhandled");
             }
         }
         else
@@ -308,7 +304,7 @@ public class Robot : MonoBehaviour
         yieldPos = otherRobotPos;
         Vector3 myPos = transform.position;
 
-        float[] checkDistances = new float[] { 1f };
+        float[] checkDistances = new float[] { 1f, 2f };
         float angleCheck = 45f;
         int checkDirections = Mathf.CeilToInt(360f / angleCheck);
 
@@ -327,7 +323,13 @@ public class Robot : MonoBehaviour
                     Mathf.RoundToInt(candidatePos.z)
                 );
 
-                if (IsPositionValid(candidatePos) && IsSafeFromPath(candidatePos) && IsPathClear(otherRobotPos, candidatePos, otherRobot))
+                bool isPosValid = IsPositionValid(candidatePos);
+                bool isSafe = IsSafeFromPath(candidatePos);
+                bool isPathClear = IsPathClear(otherRobotPos, candidatePos, otherRobot);
+
+                Debug.Log($"[Robot {robotId}] Checking yield position at {candidatePos}: Valid={isPosValid}, Safe={isSafe}, PathClear={isPathClear}");
+
+                if (isPosValid && isSafe && isPathClear)
                 {
                     if (Vector3.Distance(candidatePos, myPos) < Vector3.Distance(otherRobotPos, myPos))
                         continue;
@@ -361,9 +363,11 @@ public class Robot : MonoBehaviour
         foreach (var hit in hits)
         {
             if (hit.gameObject == gameObject) continue;
-            if (hit.CompareTag("Invalid")) return false;
-            if (hit.CompareTag("Robot")) return false;
-            //if (hit.GetComponent<Robot>() != null) return false;
+            if (hit.CompareTag("Invalid") || hit.CompareTag("Robot") ||
+                hit.CompareTag("DirtObstacle") || hit.CompareTag("UnattendedObstacle"))
+            {
+                return false;
+            }
         }
         return true;
     }
@@ -373,14 +377,14 @@ public class Robot : MonoBehaviour
         Vector3 direction = (end - start).normalized;
         float distance = Vector3.Distance(start, end);
 
-        RaycastHit[] hits = Physics.SphereCastAll(start, perceptionRadius, direction, distance);
+        RaycastHit[] hits = Physics.SphereCastAll(start, 0.45f, direction, distance);
 
         foreach (var hit in hits)
         {
             if (hit.collider.gameObject == robot.gameObject) continue;
             if (hit.collider.gameObject == gameObject) return false;
-
-            if (hit.collider.CompareTag("Invalid") || hit.collider.CompareTag("Robot"))
+            if (hit.collider.CompareTag("Invalid") || hit.collider.CompareTag("Robot") ||
+                hit.collider.CompareTag("DirtObstacle") || hit.collider.CompareTag("UnattendedObstacle"))
             {
                 return false;
             }
@@ -520,10 +524,8 @@ public class Robot : MonoBehaviour
         {
             if (IsSafeToReturn(returnPos))
             {
-                //yieldReturnPosition = returnPos;
                 UpdatePathQueue(returnPos);
                 currentState = RobotState.Moving;
-                //isReturningFromYield = true;
             }
             else
             {
@@ -561,13 +563,6 @@ public class Robot : MonoBehaviour
 
     private bool IsSafeToReturn(Vector3 targetPos)
     {
-        /* Collider[] hits = Physics.OverlapSphere(targetPos, obstacleDistanceThreshold);
-        foreach (var hit in hits)
-        {
-            if (hit.gameObject == gameObject) continue;
-            if (hit.CompareTag("Robot")) return false;
-        }
-        return true; */
         Vector3 direction = (targetPos - transform.position).normalized;
         float distanceToTarget = Vector3.Distance(transform.position, targetPos);
         RaycastHit[] hits = Physics.SphereCastAll(transform.position, perceptionRadius, direction, distanceToTarget);
@@ -713,7 +708,7 @@ public class Robot : MonoBehaviour
 
         StringMsg msg = new(JsonUtility.ToJson(data));
         Debug.Log($"[Robot {robotId}] Commanded Robot {otherRobot.robotId} to yield at {yieldPos}");
-        ros.Publish("robot_coordination", msg);
+        ros.Publish("robot/robot_coordination", msg);
     }
 
     protected void SendPathRequest()
@@ -798,8 +793,7 @@ public class Robot : MonoBehaviour
         isPathRequestPending = false;
         // Charge lock remains until robot recharges battery.
         currentState = RobotState.Moving;
-        //Debug.Log($"[Robot {robotId}] Received path with {res.path_x.Length} points.");
-    }
+}
 
     private void RobotCoordinationCallback(StringMsg msg)
     {
@@ -808,11 +802,6 @@ public class Robot : MonoBehaviour
         if (data.command == "yield")
         {
             Vector3 targetPos = new(data.x, data.y, data.z);
-            //if (yieldTargetPosition == targetPos) return;
-            //Debug.Log($"[Robot {robotId}] Received yield command to {targetPos}");
-
-            //currentState = RobotState.Yielding;
-
             Vector3[] existingPath = pathQueue.ToArray();
             pathQueue.Clear();
             pathQueue.Enqueue(targetPos);
@@ -834,9 +823,7 @@ public class Robot : MonoBehaviour
             }
 
             yieldTargetPosition = targetPos;
-            //yieldReturnPosition = transform.position;
             isMovingToYield = true;
-            //isReturningFromYield = false;
             isPausedForSafety = false;
             currentState = RobotState.Moving;
         }
