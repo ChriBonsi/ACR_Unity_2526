@@ -50,17 +50,35 @@ public class Robot : MonoBehaviour
     //private Vector3 yieldReturnPosition;
     private bool isMovingToYield = false;
     //private bool isReturningFromYield = false;
-    public bool isPausedForSafety = false;
+    
+    [SerializeField]
+    private bool _isPausedForSafety = false;
+    public bool isPausedForSafety 
+    {
+        get => _isPausedForSafety;
+        set 
+        {
+            if (_isPausedForSafety != value)
+            {
+                _isPausedForSafety = value;
+                if(SimulationLogger.Instance != null && Application.isPlaying)
+                   SimulationLogger.Instance.LogEvent("Robot", robotId.ToString(), "SafetyPause", value.ToString());
+            }
+        }
+    }
+
     private readonly Dictionary<int, float> lastCommandTime = new();
     protected string lastNodeKey = "";
     private Vector3 lastPosition = Vector3.zero;
-    private float safeDistanceThreshold = 1f;
+    private float safeDistanceThreshold = 1.5f;
     private readonly RobotState[] priorityStates = new RobotState[]
     {
         RobotState.Deadlock,
         RobotState.Yielding,
         RobotState.WaitingForPath
     };
+
+    public float CurrentBattery => battery != null ? battery.GetBattery() : 0f;
 
     protected void Start()
     {
@@ -191,6 +209,13 @@ public class Robot : MonoBehaviour
             if (objectHit == null || objectHit == gameObject) continue;
             float distance = Vector3.Distance(currentPosition, objectHit.transform.position);
 
+            if(objectHit.CompareTag("Human"))
+            {
+                if (!IsBlockingMyPath(objectHit)) continue;
+                isPausedForSafety = true;
+                return;
+            }
+
             // Dynamic robot-robot
             if (objectHit.CompareTag("Robot"))
             {
@@ -213,7 +238,7 @@ public class Robot : MonoBehaviour
     {
         // Should always be false (distance inside radius) unless distance threshold used in OverlapSphere is different
         if (distance > obstacleDistanceThreshold) return;
-        if (!IsBlockingMyPath(otherRobot)) return;
+        if (!IsBlockingMyPath(otherRobot.gameObject)) return;
 
         if(otherRobot.currentState == RobotState.Charging || otherRobot.currentState == RobotState.PerformingTask) 
         {
@@ -503,7 +528,7 @@ public class Robot : MonoBehaviour
         }
     }
 
-    private bool IsBlockingMyPath(Robot otherRobot)
+    private bool IsBlockingMyPath(GameObject otherGameObject)
     {
         Vector3 target = pathQueue.Peek();
         Vector3 direction = (target - transform.position).normalized;
@@ -513,7 +538,7 @@ public class Robot : MonoBehaviour
         RaycastHit[] hits = Physics.SphereCastAll(transform.position, perceptionRadius, direction, distanceToTarget);
         foreach (var hit in hits)
         {
-            if (hit.collider.gameObject == otherRobot.gameObject) return true;
+            if (hit.collider.gameObject == otherGameObject) return true;
         }
         return false;
     }

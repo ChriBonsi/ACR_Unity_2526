@@ -28,7 +28,7 @@ public class ObstacleManager
 
     public void ReportObstacle(GameObject obstacle, string status)
     {
-        if (obstacle == null || string.IsNullOrEmpty(status) || !validTags.Contains(obstacle.tag) || obstacles.ContainsKey(obstacle.GetInstanceID())) return;
+        if (obstacle == null || string.IsNullOrEmpty(status) || !validTags.Contains(obstacle.tag) /* || obstacles.ContainsKey(obstacle.GetInstanceID()) */) return;
         PublishObstacle(obstacle, status);
         UpdateObstacles(obstacle, status);
     }

@@ -61,7 +61,7 @@ public class CleanerRobot : Robot
             ProposeBid(objectHit);
             currentState = RobotState.PerformingTask;
             cleaningTarget = objectHit;
-            obstacleManager.ReportObstacle(gameObject, "unhandled");
+            //obstacleManager.ReportObstacle(gameObject, "unhandled");
             pathQueue.Clear();
             pathQueue.Enqueue(objectHit.transform.position);
             return true;
@@ -78,6 +78,7 @@ public class CleanerRobot : Robot
             if (!isCleaning)
             {
                 //gameObject.GetComponent<BoxCollider>().enabled = false;
+                obstacleManager.ReportObstacle(gameObject, "unhandled");
                 isCleaning = true;
                 StartCoroutine(CleanDirtRoutine(cleaningTarget));
             }
@@ -130,6 +131,11 @@ public class CleanerRobot : Robot
         
         Destroy(obstacle);
         ObstacleGenerator.CleanedDirt(GetCurrentPositionNode());
+        if (SimulationLogger.Instance != null)
+        {
+            SimulationLogger.Instance.LogEvent("CleanerRobot", robotId.ToString(), "CleanedDirt", obstacle.GetInstanceID().ToString());
+        }
+            
         //gameObject.GetComponent<BoxCollider>().enabled = true;
         currentState = RobotState.Moving;
         SendPathRequest();
@@ -180,6 +186,7 @@ public class CleanerRobot : Robot
             icon.SetActive(false);
             cleaningTarget = null;
             isCleaning = false;
+            obstacleManager.ReportObstacle(obstacleManager.GetObstacle(obstacleId), "handled");
             obstacleManager.ReportObstacle(gameObject, "handled");
             //gameObject.GetComponent<BoxCollider>().enabled = true;
             Vector3 closestDestination = GetClosestDestination();

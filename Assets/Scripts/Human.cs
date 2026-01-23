@@ -42,7 +42,14 @@ public class Human : MonoBehaviour
     {
         float waitTime = Random.Range(0.5f, 2.0f);
         yield return new WaitForSeconds(waitTime);
-        ObstacleGenerator.SpawnUnattendedObstacle(GetCurrentPositionNode());
+        string currentNode = GetCurrentPositionNode();
+        if (ObstacleGenerator.SpawnUnattendedObstacle(currentNode))
+        {
+            if (SimulationLogger.Instance != null)
+            {
+                SimulationLogger.Instance.LogEvent("Human", gameObject.GetInstanceID().ToString(), "DroppedUnattendedObstacle", currentNode);
+            }
+        }
         SendHumanPathRequest();
     }
 

@@ -45,6 +45,8 @@ public class BaggageRobot : Robot
             {
                 icon.SetActive(true);
                 //Debug.Log($"[BaggageRobot {robotId}] Fully loaded. Resuming movement.");
+                if (SimulationLogger.Instance != null)
+                    SimulationLogger.Instance.LogEvent("BaggageRobot", robotId.ToString(), "LoadingComplete", $"Capacity: {maxCapacity}");
                 TriggerBackAndForth();
             }
         }
@@ -59,6 +61,8 @@ public class BaggageRobot : Robot
             {
                 icon.SetActive(false);
                 //Debug.Log($"[BaggageRobot {robotId}] Unloaded baggage. Resuming movement.");
+                if (SimulationLogger.Instance != null)
+                    SimulationLogger.Instance.LogEvent("BaggageRobot", robotId.ToString(), "UnloadingComplete");
                 TriggerBackAndForth();
             }
         }

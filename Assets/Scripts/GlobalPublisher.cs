@@ -9,6 +9,11 @@ public class ROSGlobalPublisher : MonoBehaviour
 {
     void Awake()
     {
+        if (FindFirstObjectByType<SimulationLogger>() == null)
+        {
+            gameObject.AddComponent<SimulationLogger>();
+        }
+
         var ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<PathPlannerRequestMsg>("path_planner/request");
         ros.RegisterPublisher<PathPlannerBatteryRequestMsg>("path_planner/battery_request");

@@ -2,26 +2,43 @@ using UnityEngine;
 using System.Collections;
 using RosMessageTypes.Std;
 using System.Collections.Generic;
+using System;
 
 public class SecurityRobot : Robot
 {
-    private class SecurityBid
+    public class SecurityBid
     {
         public int robotId;
         public int objectId;
         public float distance;
     }
 
+    [Serializable]
+    public class KeyValuePair
+    {
+        public int key;
+        public SecurityBid val;
+    }
+
     private readonly Vector3[] securedLocations = new Vector3[]
     {
-        new(2, 0, 27),
-        new(27, 0, 2),
+        new(19, 0, 2),
+        new(20, 0, 2),
+        new(50, 0, 2),
+        new(50, 0, 27),
+        new(50, 0, 28),
+        new(33, 0, 49),
+        new(32, 0, 49),
+        new(2, 0, 49),
+        new(2, 0, 24),
+        new(2, 0, 23),
     };
     private Vector3 securedLocation;
     private bool isDestroying = false;
     private bool isHoldingObstacle = false;
     private GameObject unattendedTarget;
     private readonly Dictionary<int, SecurityBid> bestBids = new();
+    public List<KeyValuePair> MyList = new();
 
     new void Start()
     {
@@ -32,6 +49,13 @@ public class SecurityRobot : Robot
     new void Update()
     {
         base.Update();
+
+        MyList.Clear();
+        foreach (var kvp in bestBids)
+        {
+            MyList.Add(new KeyValuePair { key = kvp.Key, val = kvp.Value });
+        }
+
         if(currentState == RobotState.Moving) CheckTasksToDo();
     }
 
@@ -48,7 +72,7 @@ public class SecurityRobot : Robot
             ProposeBid(objectHit);
             currentState = RobotState.PerformingTask;
             unattendedTarget = objectHit;
-            obstacleManager.ReportObstacle(gameObject, "unhandled");
+            //obstacleManager.ReportObstacle(gameObject, "unhandled");
             pathQueue.Clear();
             pathQueue.Enqueue(objectHit.transform.position);
             return true;
@@ -64,6 +88,7 @@ public class SecurityRobot : Robot
         {
             if (!isHoldingObstacle)
             {
+                obstacleManager.ReportObstacle(gameObject, "unhandled");
                 isHoldingObstacle = true;
                 StartCoroutine(PickupRoutine(unattendedTarget));
             }
@@ -137,6 +162,7 @@ public class SecurityRobot : Robot
             isHoldingObstacle = false;
             isDestroying = false;
             obstacleManager.ReportObstacle(gameObject, "handled");
+            obstacleManager.ReportObstacle(obstacleManager.GetObstacle(obstacleId), "handled");
             Vector3 closestDestination = GetClosestDestination();
             SetGoal(closestDestination);
             SendPathRequest();
@@ -225,6 +251,9 @@ public class SecurityRobot : Robot
         obstacle.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
         obstacle.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
+        if (SimulationLogger.Instance != null)
+            SimulationLogger.Instance.LogEvent("SecurityRobot", robotId.ToString(), "PickupUnattended", obstacle.GetInstanceID().ToString());
+
         obstacleManager.ReportObstacle(obstacle, "handled");
         obstacleManager.ReportObstacle(gameObject, "handled");
         SetClosestSecuredLocation();
@@ -254,6 +283,9 @@ public class SecurityRobot : Robot
 
         Destroy(unattendedTarget);
         Debug.Log($"[SecurityRobot {robotId}] Package destroyed at {securedLocation}.");
+
+        if (SimulationLogger.Instance != null)
+            SimulationLogger.Instance.LogEvent("SecurityRobot", robotId.ToString(), "DisposedUnattended", securedLocation.ToString());
 
         isHoldingObstacle = false;
         isDestroying = false;

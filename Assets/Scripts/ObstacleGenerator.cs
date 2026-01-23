@@ -55,7 +55,11 @@ public class ObstacleGenerator : MonoBehaviour
                     currentDirt += 1;
                     node.hasObstacle = true;
                     node.spawnReadyTime = 0f;
-                    Instantiate(dirtPrefab, node.position + new Vector3(0, 1f, 0), Quaternion.identity, obstaclesParent.transform);
+                    GameObject dirt = Instantiate(dirtPrefab, node.position + new Vector3(0, 1f, 0), Quaternion.identity, obstaclesParent.transform);
+                    if (SimulationLogger.Instance != null)
+                    {
+                        SimulationLogger.Instance.LogEvent("ObstacleGenerator", gameObject.GetInstanceID().ToString(), "GeneratedDirt", dirt.GetInstanceID().ToString());
+                    }
                     //Debug.Log($"Obstacle at {node.position} generated dirt. Total dirt: {currentDirt}");
                 }
             }
@@ -100,14 +104,18 @@ public class ObstacleGenerator : MonoBehaviour
         ready = true;
     }
 
-    public static void CleanedDirt(string nodeKey)
+    public static bool CleanedDirt(string nodeKey)
     {
         ObstacleNode node = validNodes.GetValueOrDefault(nodeKey, null);
-        if (node == null) return;
+        if (node == null) return false;
+        
+        bool wasDirty = node.hasObstacle;
         node.dirt = 0f;
         if(node.hasObstacle) currentDirt = Mathf.Max(0, currentDirt - 1);
         node.hasObstacle = false;
         node.spawnReadyTime = 0f;
+
+        return wasDirty;
     }
 
     public static void UpdateObstacleDirt(string nodeKey, float amount = 0.0f)
@@ -145,19 +153,21 @@ public class ObstacleGenerator : MonoBehaviour
         return closestKey;
     }
 
-    public static void SpawnUnattendedObstacle(string nodeKey)
+    public static bool SpawnUnattendedObstacle(string nodeKey)
     {
         Vector3 node = invalidNodes.GetValueOrDefault(nodeKey, Vector3.zero);
-        if (node == Vector3.zero) return;
+        if (node == Vector3.zero) return false;
 
         string closestValidNodeKey = GetClosestValidNode(nodeKey);
-        if (closestValidNodeKey == null) return;
+        if (closestValidNodeKey == null) return false;
 
         float chance = Random.Range(0f, 1f);
         ObstacleNode validNode = validNodes[closestValidNodeKey];
-        if (chance < 0.3f && !validNode.hasObstacle)
+        if (chance < 0.1f && !validNode.hasObstacle)
         {
             validNode.isUnattended = true;
+            return true;
         }
+        return false;
     }
 }
